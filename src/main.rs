@@ -2,6 +2,11 @@
 use clap::{Parser, Subcommand};
 use tokio;
 
+pub mod client;
+pub mod rest_server;
+pub mod server;
+pub mod config;
+
 #[derive(Parser)]
 struct Cli {
     #[clap(subcommand)]
@@ -14,10 +19,8 @@ enum Command {
     Server,
     // Start the client
     Client,
+    RestServer,
 }
-
-pub mod client;
-pub mod server;
 
 /// Main function
 /// 
@@ -39,6 +42,13 @@ pub async fn main() -> std::io::Result<()> {
                 eprintln!("Error starting client: {}", e);
             } else {
                 println!("Client started successfully!");
+            }
+        }
+        Command::RestServer => {
+            if let Err(e) = rest_server::start_rest_server().await {
+                eprintln!("Error starting rest server: {}", e);
+            } else {
+                println!("Rest server started successfully!");
             }
         }
     };
