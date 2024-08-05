@@ -15,6 +15,7 @@ pub async fn send_messages(client: &UdpSocket, num_messages: u32) -> std::io::Re
         client.send_to(message.as_bytes(), &location).expect("Failed to send message");
         tokio::time::sleep(std::time::Duration::from_secs(1)).await; // Add a 1-second delay
     }
+    
     Ok(())
 }
 
@@ -29,15 +30,19 @@ pub async fn start_client() -> Result<(), Box<dyn Error>> {
     
     // Get the assigned port
     let client_port = client.local_addr().unwrap().port();
-    println!("Client UDP socket binded to: {ip}:{client_port}");
+    
     let client = UdpSocket::bind("0.0.0.0:0").expect("Failed to bind socket");
     client.set_multicast_loop_v4(true).expect("Failed to set multicast loop");
     let multicast_addr = Ipv4Addr::from_str(&network_multicast_ip())?;
     let interface_addr = Ipv4Addr::new(0, 0, 0, 0);
     client.join_multicast_v4(&multicast_addr, &interface_addr).expect("Failed to join multicast group");
     
+    println!("Client UDP socket binded to: {ip}:{client_port}");
+    println!("Sending to multicast address: {multicast_addr}");
+    
     loop {
         send_messages(&client, 1).await?;
+        println!("Message sent");
     }
 }
 
