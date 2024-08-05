@@ -1,12 +1,18 @@
-use std::net::{UdpSocket, Ipv4Addr};
+use std::{error::Error, net::{Ipv4Addr, UdpSocket}, str::FromStr};
+
+use crate::config::env::{multicast_port, network_multicast_ip};
 
 /// Send messages to the multicast address
 /// 
 /// 
 pub async fn send_messages(client: &UdpSocket, num_messages: u32) -> std::io::Result<()> {
+    let ip = network_multicast_ip();
+    let port = multicast_port();
+    let location = format!("{ip}:{port}");
+    
     for _ in 0..num_messages {
         let message = "Hello from client!";
-        client.send_to(message.as_bytes(), "239.0.0.1:3014").expect("Failed to send message");
+        client.send_to(message.as_bytes(), &location).expect("Failed to send message");
         tokio::time::sleep(std::time::Duration::from_secs(1)).await; // Add a 1-second delay
     }
     Ok(())
@@ -15,7 +21,7 @@ pub async fn send_messages(client: &UdpSocket, num_messages: u32) -> std::io::Re
 /// Start client server
 /// 
 /// 
-pub async fn start_client() -> std::io::Result<()> {
+pub async fn start_client() -> Result<(), Box<dyn Error>> {
     let ip = "0.0.0.0";
     
     // Create a test client and bind it to an ephemeral port
@@ -26,7 +32,7 @@ pub async fn start_client() -> std::io::Result<()> {
     println!("Client UDP socket binded to: {ip}:{client_port}");
     let client = UdpSocket::bind("0.0.0.0:0").expect("Failed to bind socket");
     client.set_multicast_loop_v4(true).expect("Failed to set multicast loop");
-    let multicast_addr = Ipv4Addr::new(224, 0, 0, 1);
+    let multicast_addr = Ipv4Addr::from_str(&network_multicast_ip())?;
     let interface_addr = Ipv4Addr::new(0, 0, 0, 0);
     client.join_multicast_v4(&multicast_addr, &interface_addr).expect("Failed to join multicast group");
     
@@ -50,7 +56,7 @@ async fn test_server() {
     println!("Client UDP socket binded to: {ip}:{client_port}");
     
     client.set_multicast_loop_v4(true).expect("Failed to set multicast loop");
-    let multicast_addr = Ipv4Addr::new(224, 0, 0, 1);
+    let multicast_addr = Ipv4Addr::from_str(&network_multicast_ip()).unwrap();
     let interface_addr = Ipv4Addr::new(0, 0, 0, 0);
     client.join_multicast_v4(&multicast_addr, &interface_addr).expect("Failed to join multicast group");
     

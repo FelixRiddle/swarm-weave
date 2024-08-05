@@ -1,6 +1,9 @@
-/// Distributed computing server using Actix-web and multicast discovery
+//! Distributed computing server using Actix-web and multicast discovery
+//! 
+//! 
 use clap::{Parser, Subcommand};
 use tokio;
+use std::env;
 
 pub mod client;
 pub mod rest_server;
@@ -22,11 +25,18 @@ enum Command {
     RestServer,
 }
 
+#[cfg(debug_assertions)]
+fn set_debug() {
+    env::set_var("DEBUG", "TRUE");
+}
+
 /// Main function
 /// 
 /// 
 #[tokio::main]
 pub async fn main() -> std::io::Result<()> {
+    set_debug();
+    
     let cli = Cli::parse();
     
     match cli.command {

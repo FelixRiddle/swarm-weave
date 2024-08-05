@@ -1,18 +1,24 @@
 use std::error::Error;
 use std::net::{UdpSocket, Ipv4Addr};
+use std::str::FromStr;
+
+use crate::config::env::{multicast_port, network_multicast_ip};
 
 /// Start server
 /// 
 /// 
 pub async fn start_server() -> Result<(), Box<dyn Error>> {
+    // Local ip and port
     let ip = "0.0.0.0";
-    let port = "3014";
+    let port = multicast_port();
     let location = format!("{ip}:{port}");
     
     let socket = UdpSocket::bind(&location)?;
     socket.set_multicast_loop_v4(true)?;
     
-    let multicast_addr = Ipv4Addr::new(224, 0, 0, 1);
+    // Network multicast
+    let multicast_addr = Ipv4Addr::from_str(&network_multicast_ip())?;
+    
     let interface_addr = Ipv4Addr::new(0, 0, 0, 0);
     socket.join_multicast_v4(&multicast_addr, &interface_addr)?;
     println!("UDP server started at: {location}");
