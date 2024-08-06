@@ -23,7 +23,7 @@ pub async fn start_server() -> Result<(), Box<dyn Error>> {
     socket.join_multicast_v4(&multicast_addr, &interface_addr)?;
     println!("UDP server started at: {location}");
     println!("UDP binded to {}", multicast_addr.to_string());
-
+    
     loop {
         let mut buf = [0; 1024];
         match socket.recv_from(&mut buf) {

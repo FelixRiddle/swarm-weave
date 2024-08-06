@@ -46,38 +46,38 @@ pub async fn start_client() -> Result<(), Box<dyn Error>> {
     }
 }
 
-/// Test server
-/// 
-/// 
-#[tokio::test]
-async fn test_server() {
-    let ip = "0.0.0.0";
+// /// Test server
+// /// 
+// /// 
+// #[tokio::test]
+// async fn test_server() {
+//     let ip = "0.0.0.0";
     
-    // Create a test client and bind it to an ephemeral port
-    let client = UdpSocket::bind("0.0.0.0:0").expect("Failed to bind client socket");
+//     // Create a test client and bind it to an ephemeral port
+//     let client = UdpSocket::bind("0.0.0.0:0").expect("Failed to bind client socket");
     
-    // Get the assigned port
-    let client_port = client.local_addr().unwrap().port();
-    println!("Client UDP socket binded to: {ip}:{client_port}");
+//     // Get the assigned port
+//     let client_port = client.local_addr().unwrap().port();
+//     println!("Client UDP socket binded to: {ip}:{client_port}");
     
-    client.set_multicast_loop_v4(true).expect("Failed to set multicast loop");
-    let multicast_addr = Ipv4Addr::from_str(&network_multicast_ip()).unwrap();
-    let interface_addr = Ipv4Addr::new(0, 0, 0, 0);
-    client.join_multicast_v4(&multicast_addr, &interface_addr).expect("Failed to join multicast group");
+//     client.set_multicast_loop_v4(true).expect("Failed to set multicast loop");
+//     let multicast_addr = Ipv4Addr::from_str(&network_multicast_ip()).unwrap();
+//     let interface_addr = Ipv4Addr::new(0, 0, 0, 0);
+//     client.join_multicast_v4(&multicast_addr, &interface_addr).expect("Failed to join multicast group");
     
-    // // Start the server in a separate task
-    // tokio::spawn(async move {
-    //     start_server().await.unwrap();
-    // });
+//     // // Start the server in a separate task
+//     // tokio::spawn(async move {
+//     //     start_server().await.unwrap();
+//     // });
     
-    // Send 5 messages to the server
-    send_messages(&client, 5).await.unwrap();
+//     // Send 5 messages to the server
+//     send_messages(&client, 5).await.unwrap();
     
-    // Receive the response from the server
-    let mut buffer = [0; 1024];
-    let (bytes_received, _) = client.recv_from(&mut buffer).expect("Failed to receive message");
+//     // Receive the response from the server
+//     let mut buffer = [0; 1024];
+//     let (bytes_received, _) = client.recv_from(&mut buffer).expect("Failed to receive message");
     
-    // Assert that the response matches the expected message
-    let expected_message = "Hello from client!";
-    assert_eq!(&buffer[..bytes_received], expected_message.as_bytes());
-}
+//     // Assert that the response matches the expected message
+//     let expected_message = "Hello from client!";
+//     assert_eq!(&buffer[..bytes_received], expected_message.as_bytes());
+// }

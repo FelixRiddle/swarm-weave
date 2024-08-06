@@ -5,10 +5,14 @@ use clap::{Parser, Subcommand};
 use tokio;
 use std::env;
 
-pub mod client;
-pub mod rest_server;
-pub mod server;
 pub mod config;
+pub mod multicast;
+pub mod rest_server;
+
+use multicast::udp_socket::{
+    client,
+    server
+};
 
 #[derive(Parser)]
 struct Cli {
