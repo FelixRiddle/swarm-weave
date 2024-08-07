@@ -15,6 +15,16 @@ Attempt to build a distributed computing / systems in rust.
 # REST API
 PORT=3014
 
+# Required
+SECRET_TOKEN=super-secret
+
+# MySQL database
+MYSQL_DATABASE_NAME=perseverancia-development
+MYSQL_USERNAME=root
+MYSQL_PASSWORD=123
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+
 # Not used anymore
 
 # Network multicast ip
