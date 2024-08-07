@@ -2,17 +2,13 @@
 //! 
 //! 
 use clap::{Parser, Subcommand};
+use config::env::set_debug;
 use tokio;
-use std::env;
 
+pub mod client;
 pub mod config;
 pub mod multicast;
-pub mod rest_server;
-
-use multicast::udp_socket::{
-    client,
-    server
-};
+pub mod server;
 
 #[derive(Parser)]
 struct Cli {
@@ -26,13 +22,8 @@ enum Command {
     Server,
     // Start the client
     Client,
-    RestServer,
 }
 
-#[cfg(debug_assertions)]
-fn set_debug() {
-    env::set_var("DEBUG", "TRUE");
-}
 
 /// Main function
 /// 
@@ -52,21 +43,14 @@ pub async fn main() -> std::io::Result<()> {
             }
         }
         Command::Client => {
-            if let Err(e) = client::start_client().await {
+            if let Err(e) = client::gui::main().await {
                 eprintln!("Error starting client: {}", e);
             } else {
                 println!("Client started successfully!");
             }
         }
-        Command::RestServer => {
-            if let Err(e) = rest_server::start_rest_server().await {
-                eprintln!("Error starting rest server: {}", e);
-            } else {
-                println!("Rest server started successfully!");
-            }
-        }
     };
-
+    
     Ok(())
 }
 
