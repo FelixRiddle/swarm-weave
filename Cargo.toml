@@ -10,6 +10,7 @@ categories = ["web-programming", "database"]
 [workspace]
 members = [
     ".",
+    "entity",
     "migration"
 ]
 
