@@ -1,11 +1,12 @@
 use std::error::Error;
-
 use clap::{Parser, Subcommand};
+
+use crate::client;
+use crate::database;
 use crate::server::{
     self,
     StartServerOptions,
 };
-use crate::client;
 
 #[derive(Parser)]
 struct Cli {
@@ -15,13 +16,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    // Start the server
+    /// Start the server
     Server {
         #[clap(short, long)]
         port: Option<u16>,
     },
-    // Start the client
+    /// Start the client
     Client,
+    /// Print
+    Print {
+        /// Show mysql connection string
+        #[clap(short, long)]
+        mysql_connection_string: bool,
+    },
 }
 
 /// Main
@@ -46,6 +53,13 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         Command::Client => {
             // Run egui app in a separate thread
             std::thread::spawn(client::gui::main);
+        }
+        Command::Print {
+            mysql_connection_string,
+        } => {
+            if mysql_connection_string {
+                println!("MySQL connection string: {}", database::mysql_connection_string());
+            }
         }
     };
     

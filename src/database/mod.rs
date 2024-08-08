@@ -4,13 +4,18 @@ use sea_orm::{Database, DatabaseConnection};
 
 use crate::config::env::{mysql_database, mysql_host, mysql_password, mysql_port, mysql_username};
 
+/// Mysql connection string
+/// 
+/// 
+pub fn mysql_connection_string() -> String {
+    format!("mysql://{}:{}@{}:{}/{}", mysql_username(), mysql_password(), mysql_host(), mysql_port(), mysql_database())
+}
+
 /// Create MySQL connection
 /// 
 /// 
 pub async fn mysql_connection() -> Result<DatabaseConnection, Box<dyn Error>> {
-    let url = format!("mysql://{}:{}@{}:{}/{}", mysql_username(), mysql_password(), mysql_host(), mysql_port(), mysql_database());
-    println!("Url: {}", url);
-    Ok(Database::connect(&url).await?)
+    Ok(Database::connect(&mysql_connection_string()).await?)
 }
 
 // Cannot run test because environment variables are not set.
