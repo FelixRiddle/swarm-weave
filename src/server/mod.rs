@@ -1,8 +1,10 @@
-use actix_web::{App, HttpServer};
+use actix_web::{App, HttpServer, middleware::Logger};
+use env_logger::Env;
 use std::error::Error;
 
 use crate::config::env::server_port;
 
+pub mod middleware;
 pub mod routes;
 
 pub struct StartServerOptions {
@@ -53,9 +55,13 @@ pub async fn start_server(start_server_options: StartServerOptions) -> Result<()
     
     println!("Server running at {location}");
     
+    env_logger::init_from_env(Env::default().default_filter_or("info"));
+    
     // Start the Actix-web server
     HttpServer::new(|| {
         App::new()
+            .wrap(Logger::default())
+            .wrap(Logger::new("%a %{User-Agent}i"))
             .service(routes::main()) 
     })
         .bind(location)?
