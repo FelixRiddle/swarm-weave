@@ -1,8 +1,10 @@
 # Swarm weave
 
-'Perseverancia' backend implementation in Rust.
+'Perseverancia' backend implementation in Rust; This is a general backend for my many apps.
 
-'Perseverancia' backend is a general backend for my many apps.
+Features:
+* Authentication
+* Nodes detection
 
 <!--
 Original goal:

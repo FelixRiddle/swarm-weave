@@ -3,11 +3,12 @@
 //! 
 use clap::{Parser, Subcommand};
 use config::env::set_debug;
+use server::StartServerOptions;
+use std::error::Error;
 use tokio;
 
 pub mod client;
 pub mod config;
-pub mod multicast;
 pub mod server;
 
 #[derive(Parser)]
@@ -29,25 +30,23 @@ enum Command {
 /// 
 /// 
 #[tokio::main]
-pub async fn main() -> std::io::Result<()> {
+pub async fn main() -> Result<(), Box<dyn Error>> {
     set_debug();
     
     let cli = Cli::parse();
     
     match cli.command {
         Command::Server => {
-            if let Err(e) = server::start_server().await {
+            let options = StartServerOptions::default_controlled()?;
+            if let Err(e) = server::start_server(options).await {
                 eprintln!("Error starting server: {}", e);
             } else {
                 println!("Server started successfully!");
             }
         }
         Command::Client => {
-            if let Err(e) = client::gui::main().await {
-                eprintln!("Error starting client: {}", e);
-            } else {
-                println!("Client started successfully!");
-            }
+            // Run egui app in a separate thread
+            std::thread::spawn(client::gui::main);
         }
     };
     
