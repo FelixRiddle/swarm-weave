@@ -7,6 +7,12 @@ authors = ["Felix Riddle <email@email.com>"]
 keywords = ["backend", "general", "api", "rust"]
 categories = ["web-programming", "database"]
 
+[workspace]
+members = [
+    ".",
+    "migration"
+]
+
 [dependencies]
 actix-web = "4.8.0"
 chrono = "0.4.38"
@@ -36,3 +42,6 @@ features = ["sqlx-mysql", "runtime-tokio-native-tls", "with-chrono", "with-json"
 [dependencies.tokio]
 version = "1.39.2"
 features = ["full"]
+
+[dependencies.migration]
+path = "migration"

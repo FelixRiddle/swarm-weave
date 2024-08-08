@@ -51,6 +51,8 @@ impl Default for StartServerOptions {
 pub async fn start_server(start_server_options: StartServerOptions) -> Result<(), Box<dyn Error>> {
     let location = start_server_options.location();
     
+    println!("Server running at {location}");
+    
     // Start the Actix-web server
     HttpServer::new(|| {
         App::new()
