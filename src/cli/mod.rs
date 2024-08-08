@@ -58,7 +58,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             mysql_connection_string,
         } => {
             if mysql_connection_string {
-                println!("MySQL connection string: {}", database::mysql_connection_string());
+                println!("{}", database::mysql_connection_string());
             }
         }
     };
