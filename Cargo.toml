@@ -15,6 +15,7 @@ members = [
 ]
 
 [dependencies]
+actix-session = "0.10.0"
 actix-web = "4.8.0"
 chrono = "0.4.38"
 dotenv = "0.15.0"
