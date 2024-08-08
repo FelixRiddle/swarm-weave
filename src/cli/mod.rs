@@ -58,6 +58,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             mysql_connection_string,
         } => {
             if mysql_connection_string {
+                // Don't change!, there's a script that relies on this output
                 println!("{}", database::mysql_connection_string());
             }
         }

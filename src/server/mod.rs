@@ -1,9 +1,9 @@
-use actix_web::{App, web, HttpServer};
+use actix_web::{App, HttpServer};
 use std::error::Error;
 
 use crate::config::env::server_port;
 
-pub mod app_info;
+pub mod routes;
 
 pub struct StartServerOptions {
     pub host: String,
@@ -56,7 +56,7 @@ pub async fn start_server(start_server_options: StartServerOptions) -> Result<()
     // Start the Actix-web server
     HttpServer::new(|| {
         App::new()
-            .route("/app-info", web::get().to(app_info::app_info)) 
+            .service(routes::main()) 
     })
         .bind(location)?
         .run()
