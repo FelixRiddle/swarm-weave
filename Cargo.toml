@@ -10,6 +10,7 @@ categories = ["web-programming", "database"]
 [dependencies]
 actix-web = "4.8.0"
 chrono = "0.4.38"
+dotenv = "0.15.0"
 eframe = "0.28.1"
 egui = "0.28.1"
 egui-winit = "0.28.1"

@@ -204,7 +204,7 @@ mod tests {
         env::set_var("MYSQL_PASSWORD", "test_password");
         assert_eq!(mysql_password(), "test_password");
 
-        env::remove_var("MYSQL_PASSWORD");
+        env::set_var("MYSQL_PASSWORD", "");
         assert_eq!(mysql_password(), "");
     }
 

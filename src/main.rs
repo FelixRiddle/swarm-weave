@@ -3,12 +3,14 @@
 //! 
 use clap::{Parser, Subcommand};
 use config::env::set_debug;
+use dotenv::dotenv;
 use server::StartServerOptions;
 use std::error::Error;
 use tokio;
 
 pub mod client;
 pub mod config;
+pub mod database;
 pub mod server;
 
 #[derive(Parser)]
@@ -25,12 +27,14 @@ enum Command {
     Client,
 }
 
-
 /// Main function
 /// 
 /// 
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn Error>> {
+    // Parse environment variables
+    dotenv().ok();
+    
     set_debug();
     
     let cli = Cli::parse();
