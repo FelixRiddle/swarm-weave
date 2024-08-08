@@ -108,14 +108,22 @@ pub fn mysql_port() -> String {
 /// 
 /// 
 pub fn mysql_database() -> String {
-    env::var("MYSQL_DATABASE").unwrap_or_else(|_| {
-        // Check debug first
-        if is_development() {
-            return "perseverancia-development".to_string();
-        } else {
-            return "perseverancia-production".to_string();
-        }
-    })
+    match env::var("MYSQL_DATABASE") {
+        Ok(db_name) => return db_name.to_string(),
+        Err(_) => { }
+    };
+    
+    match env::var("MYSQL_DATABASE_NAME") {
+        Ok(db_name) => return db_name.to_string(),
+        Err(_) => { }
+    };
+    
+    // Check debug first
+    if is_development() {
+        return "perseverancia-development".to_string();
+    } else {
+        return "perseverancia-production".to_string();
+    }
 }
 
 /// Secret token
@@ -228,12 +236,24 @@ mod tests {
 
     #[test]
     fn test_mysql_database() {
+        // Test with MYSQL_DATABASE set
         env::set_var("DEBUG", "TRUE");
         env::set_var("MYSQL_DATABASE", "test_db");
         assert_eq!(mysql_database(), "test_db");
-
+        
+        // Test with MYSQL_DATABASE_NAME set
+        env::remove_var("MYSQL_DATABASE");
+        env::set_var("MYSQL_DATABASE_NAME", "test_db_name");
+        assert_eq!(mysql_database(), "test_db_name");
+        
+        // Test with both MYSQL_DATABASE and MYSQL_DATABASE_NAME set
+        env::set_var("MYSQL_DATABASE", "test_db_both");
+        assert_eq!(mysql_database(), "test_db_both");
+        
+        // Test with neither MYSQL_DATABASE nor MYSQL_DATABASE_NAME set
         env::remove_var("DEBUG");
         env::remove_var("MYSQL_DATABASE");
+        env::remove_var("MYSQL_DATABASE_NAME");
         assert_eq!(mysql_database(), "perseverancia-production");
     }
 
