@@ -10,6 +10,7 @@ pub mod app_info;
 /// 
 /// 
 pub fn main() -> Scope {
-    web::scope("/")
+    web::scope("")
         .route("/app-info", web::get().to(app_info::app_info))
+        .service(api::main())
 }

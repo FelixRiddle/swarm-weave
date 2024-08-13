@@ -23,7 +23,6 @@ pub fn main() -> Scope {
         .route("", web::get().to(get_server_node))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -34,7 +33,7 @@ mod tests {
         let app = test::init_service(App::new().route("/", web::get().to(get_server_node))).await;
         let req = test::TestRequest::get().uri("/").to_request();
         let res = test::call_service(&app, req).await;
-
+        
         assert!(res.status().is_success());
         let body = test::read_body(res).await;
         let _server_node: ServerNode = serde_json::from_slice(&body).unwrap();
