@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use sysinfo::System;
 
@@ -6,16 +7,19 @@ pub mod storage;
 
 pub use resources::Resources;
 
+#[derive(Deserialize, Serialize)]
 pub enum Location {
     IpAddress(IpAddress),
     DomainName(String),
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct IpAddress {
     pub address: String,
     pub port: u16,
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct ServerNode {
     pub id: u32,
     pub hostname: Option<String>,
@@ -26,12 +30,14 @@ pub struct ServerNode {
 }
 
 #[derive(Debug, PartialEq)]
+#[derive(Deserialize, Serialize)]
 pub enum ServerStatus {
     Online,
     Offline,
     Maintenance,
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct SystemInfo {
     pub name: String,
     pub kernel_version: String,

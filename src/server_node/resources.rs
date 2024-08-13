@@ -6,6 +6,7 @@ use sysinfo::{
 
 use super::storage::Storage;
 
+#[derive(Deserialize, Serialize)]
 pub struct Resources {
     pub cpus: Vec<Cpu>,
     pub memory: Memory,
@@ -18,6 +19,7 @@ pub struct Cpu {
     pub free_percentage: f64,
 }
 
+#[derive(Deserialize, Serialize)]
 pub struct Memory {
     pub total: f64,
     pub used: f64,
