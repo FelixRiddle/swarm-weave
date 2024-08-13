@@ -23,6 +23,7 @@ pub struct ServerNode {
     pub system_info: SystemInfo,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ServerStatus {
     Online,
     Offline,
@@ -44,5 +45,49 @@ impl SystemInfo {
             os_version: System::os_version().unwrap_or("Unknown".to_string()),
             host_name: System::host_name().unwrap_or("Unknown".to_string()),
         }
+    }
+}
+
+impl ServerNode {
+    pub fn new(id: u32, location: Location, status: ServerStatus) -> Self {
+        Self {
+            id,
+            hostname: None,
+            location,
+            status,
+            resources: Resources::fetch_resources(),
+            system_info: SystemInfo::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_server_node_new() {
+        let location = Location::IpAddress(IpAddress {
+            address: "127.0.0.1".to_string(),
+            port: 8080,
+        });
+        let node = ServerNode::new(1, location, ServerStatus::Online);
+
+        assert_eq!(node.id, 1);
+        assert_eq!(node.status, ServerStatus::Online);
+        assert!(node.resources.cpus.len() > 0);
+        assert!(node.system_info.name.len() > 0);
+    }
+
+    #[test]
+    fn test_server_node_hostname() {
+        let location = Location::IpAddress(IpAddress {
+            address: "127.0.0.1".to_string(),
+            port: 8080,
+        });
+        let mut node = ServerNode::new(1, location, ServerStatus::Online);
+        node.hostname = Some("example.com".to_string());
+
+        assert_eq!(node.hostname.unwrap(), "example.com");
     }
 }
