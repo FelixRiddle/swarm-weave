@@ -3,6 +3,7 @@ use actix_web::{
     web
 };
 
+pub mod api;
 pub mod app_info;
 
 /// Routes main
