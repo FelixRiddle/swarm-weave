@@ -1,3 +1,4 @@
+use get_if_addrs::{get_if_addrs, IfAddr};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use sysinfo::System;
@@ -6,6 +7,8 @@ pub mod resources;
 pub mod storage;
 
 pub use resources::Resources;
+
+use crate::config::env::server_port;
 
 #[derive(Deserialize, Serialize)]
 pub enum Location {
@@ -56,13 +59,27 @@ impl SystemInfo {
     }
 }
 
+fn get_computer_ip() -> Result<String, Box<dyn Error>> {
+    let interfaces = get_if_addrs()?;
+    for interface in interfaces {
+        if let IfAddr::V4(addr) = interface.addr {
+            return Ok(addr.ip.to_string());
+        }
+    }
+    
+    Ok("0.0.0.0".to_string())
+}
+
 impl ServerNode {
-    pub fn new(id: u32, location: Location, status: ServerStatus) -> Result<Self, Box<dyn Error>> {
+    pub fn new(id: u32) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
             id,
             hostname: None,
-            location,
-            status,
+            location: Location::IpAddress(IpAddress {
+                address: get_computer_ip()?,
+                port: server_port().parse::<u16>()?,
+            }),
+            status: ServerStatus::Online,
             resources: Resources::fetch_resources()?,
             system_info: SystemInfo::new(),
         })
@@ -75,11 +92,7 @@ mod tests {
 
     #[test]
     fn test_server_node_new() {
-        let location = Location::IpAddress(IpAddress {
-            address: "127.0.0.1".to_string(),
-            port: 8080,
-        });
-        let node = ServerNode::new(1, location, ServerStatus::Online).unwrap();
+        let node = ServerNode::new(1).unwrap();
 
         assert_eq!(node.id, 1);
         assert_eq!(node.status, ServerStatus::Online);
@@ -89,11 +102,7 @@ mod tests {
 
     #[test]
     fn test_server_node_hostname() {
-        let location = Location::IpAddress(IpAddress {
-            address: "127.0.0.1".to_string(),
-            port: 8080,
-        });
-        let mut node = ServerNode::new(1, location, ServerStatus::Online).unwrap();
+        let mut node = ServerNode::new(1).unwrap();
         node.hostname = Some("example.com".to_string());
 
         assert_eq!(node.hostname.unwrap(), "example.com");
