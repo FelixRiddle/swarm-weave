@@ -6,7 +6,7 @@ use sysinfo::{
 pub struct Resources {
     pub cpus: Vec<Cpu>,
     pub memory: Memory,
-    pub storage: Storage,
+    pub storage: Vec<Storage>
 }
 
 pub struct Cpu {
@@ -25,13 +25,19 @@ pub struct Storage {
     pub used: f64,
 }
 
+impl Storage {
+    pub fn usage_percentage(&self) -> f64 {
+        (self.used as f64 / self.total as f64) * 100.0
+    }
+}
+
 impl Resources {
     pub fn total_cores(&self) -> u32 {
         self.cpus.len() as u32
     }
     
-    pub fn storage_usage_percentage(&self) -> f64 {
-        (self.storage.used / self.storage.total) * 100.0
+    pub fn total_storage_usage_percentage(&self) -> f64 {
+        self.storage.iter().map(|storage| storage.usage_percentage()).sum::<f64>() / self.storage.len() as f64
     }
     
     pub fn fetch_resources() -> Resources {
@@ -51,24 +57,26 @@ impl Resources {
             free: sys.available_memory() as f64,
         };
         
-        let mut total_storage = 0.0;
-        let mut used_storage = 0.0;
-        
+        // Storage
         let disks = Disks::new_with_refreshed_list();
+        let mut storages = Vec::new();
+
         for disk in disks.list() {
-            total_storage += disk.total_space() as f64;
-            used_storage += disk.available_space() as f64;
+            let total = disk.total_space() as f64;
+            let used = total - disk.available_space() as f64;
+
+            let storage = Storage {
+                total,
+                used,
+            };
+            
+            storages.push(storage);
         }
-        
-        let storage = Storage {
-            total: total_storage,
-            used: used_storage,
-        };
         
         Resources {
             cpus,
             memory,
-            storage,
+            storage: storages,
         }
     }
 }
@@ -82,7 +90,7 @@ mod tests {
         let resources = Resources::fetch_resources();
         assert!(resources.cpus.len() > 0);
         assert!(resources.memory.total > 0.0);
-        assert!(resources.storage.total > 0.0);
+        assert!(!resources.storage.is_empty()); // Check if storage vector is not empty
     }
 
     #[test]
@@ -94,6 +102,6 @@ mod tests {
     #[test]
     fn test_storage_usage_percentage() {
         let resources = Resources::fetch_resources();
-        assert!(resources.storage_usage_percentage() >= 0.0 && resources.storage_usage_percentage() <= 100.0);
+        assert!(resources.total_storage_usage_percentage() >= 0.0 && resources.total_storage_usage_percentage() <= 100.0);
     }
 }
