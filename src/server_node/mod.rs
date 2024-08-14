@@ -63,7 +63,10 @@ fn get_computer_ip() -> Result<String, Box<dyn Error>> {
     let interfaces = get_if_addrs()?;
     for interface in interfaces {
         if let IfAddr::V4(addr) = interface.addr {
-            return Ok(addr.ip.to_string());
+            let ip = addr.ip;
+            if !ip.is_loopback() {
+                return Ok(ip.to_string());
+            }
         }
     }
     
@@ -89,22 +92,22 @@ impl ServerNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    
     #[test]
     fn test_server_node_new() {
         let node = ServerNode::new(1).unwrap();
-
+        
         assert_eq!(node.id, 1);
         assert_eq!(node.status, ServerStatus::Online);
         assert!(node.resources.cpus.len() > 0);
         assert!(node.system_info.name.len() > 0);
     }
-
+    
     #[test]
     fn test_server_node_hostname() {
         let mut node = ServerNode::new(1).unwrap();
         node.hostname = Some("example.com".to_string());
-
+        
         assert_eq!(node.hostname.unwrap(), "example.com");
     }
 }
