@@ -9,9 +9,9 @@ pub mod server_node;
 /// 
 /// 
 pub fn main() -> Scope {
-    web::scope("/")
+    web::scope("/api")
         .service(
-            web::scope("/server_node")
+            web::scope("/server-node")
                 .service(server_node::main())
         )
 }

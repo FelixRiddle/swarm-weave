@@ -19,7 +19,7 @@ async fn get_server_node() -> impl Responder {
 /// 
 /// 
 pub fn main() -> Scope {
-    web::scope("/")
+    web::scope("")
         .route("", web::get().to(get_server_node))
 }
 
