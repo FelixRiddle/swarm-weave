@@ -1,6 +1,7 @@
 use actix_web::{
-    web, HttpResponse, Responder, Scope
+    web, HttpRequest, HttpResponse, Responder, Scope
 };
+use serde::{Deserialize, Serialize};
 
 use crate::server_node::ServerNode;
 
@@ -15,12 +16,28 @@ async fn get_server_node() -> impl Responder {
     }
 }
 
+#[derive(Deserialize, Serialize)]
+struct LocationRequest {
+    location: String,
+}
+
+/// Create server node
+/// 
+/// 
+async fn post_location(_req: HttpRequest, body: web::Json<LocationRequest>) -> impl Responder {
+    let location = body.location.clone();
+    // Process the location here
+    println!("Received location: {}", location);
+    HttpResponse::Ok().body("Location received successfully")
+}
+
 /// Main
 /// 
 /// 
 pub fn main() -> Scope {
     web::scope("")
         .route("", web::get().to(get_server_node))
+        .route("", web::post().to(post_location))
 }
 
 #[cfg(test)]

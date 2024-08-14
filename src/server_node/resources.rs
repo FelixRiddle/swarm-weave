@@ -1,3 +1,7 @@
+use chrono::{
+    DateTime,
+    Utc
+};
 use std::error::Error;
 use serde::{Deserialize, Serialize};
 use sysinfo::{
@@ -10,7 +14,8 @@ use super::storage::Storage;
 pub struct Resources {
     pub cpus: Vec<Cpu>,
     pub memory: Memory,
-    pub storage: Vec<Storage>
+    pub storage: Vec<Storage>,
+    pub eval_time: DateTime<Utc>
 }
 
 #[derive(Deserialize, Serialize)]
@@ -66,6 +71,7 @@ impl Resources {
             cpus,
             memory,
             storage: storages,
+            eval_time: Utc::now(),
         })
     }
 }
