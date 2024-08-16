@@ -3,27 +3,28 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "note")]
+#[sea_orm(table_name = "server-location")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
+    #[sea_orm(column_type = "Text")]
+    pub name: String,
     #[sea_orm(column_type = "Text", nullable)]
-    pub note: Option<String>,
-    #[sea_orm(column_name = "createdAt")]
-    pub created_at: DateTime,
-    #[sea_orm(column_name = "updatedAt")]
-    pub updated_at: DateTime,
+    pub domain: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub address: Option<String>,
+    pub port: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::log_notes::Entity")]
-    LogNotes,
+    #[sea_orm(has_many = "super::server_node::Entity")]
+    ServerNode,
 }
 
-impl Related<super::log_notes::Entity> for Entity {
+impl Related<super::server_node::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::LogNotes.def()
+        Relation::ServerNode.def()
     }
 }
 

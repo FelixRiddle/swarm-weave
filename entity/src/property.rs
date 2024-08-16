@@ -40,6 +40,8 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     Category,
+    #[sea_orm(has_many = "super::debug_property_image_upload::Entity")]
+    DebugPropertyImageUpload,
     #[sea_orm(has_many = "super::general_property_information::Entity")]
     GeneralPropertyInformation,
     #[sea_orm(
@@ -71,6 +73,12 @@ pub enum Relation {
 impl Related<super::category::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Category.def()
+    }
+}
+
+impl Related<super::debug_property_image_upload::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::DebugPropertyImageUpload.def()
     }
 }
 
