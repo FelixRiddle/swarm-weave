@@ -26,6 +26,11 @@ enum Command {
         #[clap(short, long)]
         mysql_connection_string: bool,
     },
+    MDNS {
+        /// Discover nodes
+        #[clap(short, long)]
+        discover: bool,
+    }
 }
 
 /// Main
@@ -53,6 +58,13 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             if mysql_connection_string {
                 // Don't change!, there's a script that relies on this output
                 println!("{}", database::mysql_connection_string());
+            }
+        }
+        Command::MDNS {
+            discover
+        } => {
+            if discover {
+                server::multicast::mdns_example::discover_nodes().await?;
             }
         }
     };

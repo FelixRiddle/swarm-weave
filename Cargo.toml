@@ -17,13 +17,16 @@ members = [
 [dependencies]
 actix-session = "0.10.0"
 actix-web = "4.8.0"
+async-trait = "0.1.81"
 chrono = "0.4.38"
 dotenv = "0.15.0"
 env_logger = "0.11.5"
 futures = "0.3.30"
+futures-util = "0.3.30"
 get_if_addrs = "0.5.3"
 jsonwebtoken = "9.3.0"
 lazy_static = "1.5.0"
+mdns = "3.0.0"
 names = "0.14.0"
 serde = "1.0.204"
 serde_json = "1.0.122"
@@ -39,19 +42,22 @@ features = [
     "color"
 ]
 
-[dependencies.sea-orm]
-version = "1.0.0"
-features = ["sqlx-mysql", "runtime-tokio-native-tls", "with-chrono", "with-json", "macros"]
-
-[dependencies.tokio]
-version = "1.39.2"
-features = ["full"]
+[dependencies.entity]
+path = "entity"
 
 [dependencies.migration]
 path = "migration"
+
+[dependencies.sea-orm]
+version = "1.0.0"
+features = ["sqlx-mysql", "runtime-tokio-native-tls", "with-chrono", "with-json", "macros"]
 
 [dependencies.sysinfo]
 version = "0.31.2"
 features = [
     "serde"
 ]
+[dependencies.tokio]
+version = "1.39.2"
+features = ["full"]
+

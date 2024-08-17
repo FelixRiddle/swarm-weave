@@ -10,6 +10,7 @@ pub mod cli;
 pub mod client;
 pub mod config;
 pub mod database;
+pub mod model;
 pub mod security;
 pub mod server;
 pub mod server_node;
