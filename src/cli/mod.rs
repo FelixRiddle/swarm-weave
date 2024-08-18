@@ -64,7 +64,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             discover
         } => {
             if discover {
-                server::multicast::mdns_example::discover_nodes().await?;
+                server::swarm_mdns::main().await?;
             }
         }
     };
