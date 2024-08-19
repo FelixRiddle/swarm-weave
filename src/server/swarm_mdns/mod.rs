@@ -1,4 +1,5 @@
 use futures::StreamExt;
+use libp2p::multiaddr::Protocol;
 // Import the missing items
 use libp2p::{
     gossipsub, mdns, noise, swarm::SwarmEvent, tcp, yamux, SwarmBuilder,
@@ -89,18 +90,28 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             event = swarm.select_next_some() => match event {
+                // MyBehavior event is an enum created with select!
                 SwarmEvent::Behaviour(MyBehaviorEvent::Mdns(mdns::Event::Discovered(list))) => {
-                    for (peer_id, _multiaddr) in list {
+                    for (peer_id, multiaddr) in list {
                         println!("mDNS discovered a new peer: {peer_id}");
+                        
+                        // Extract IP address from multiaddr
+                        let components: Vec<_> = multiaddr.iter().collect();
+                        if let Protocol::Ip4(ipv4_addr) = components[0] {
+                            println!("IP address: {}", ipv4_addr);
+                        } else {
+                            println!("Unsupported protocol");
+                        }
+                        
                         swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                     }
-                },
+                }
                 SwarmEvent::Behaviour(MyBehaviorEvent::Mdns(mdns::Event::Expired(list))) => {
                     for (peer_id, _multiaddr) in list {
                         println!("mDNS discover peer has expired: {peer_id}");
                         swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
                     }
-                },
+                }
                 SwarmEvent::Behaviour(MyBehaviorEvent::Gossipsub(gossipsub::Event::Message {
                     propagation_source: peer_id,
                     message_id: id,
