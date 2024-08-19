@@ -97,10 +97,10 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                         
                         // Extract IP address from multiaddr
                         let components: Vec<_> = multiaddr.iter().collect();
-                        if let Protocol::Ip4(ipv4_addr) = components[0] {
-                            println!("IP address: {}", ipv4_addr);
-                        } else {
-                            println!("Unsupported protocol");
+                        match components[0] {
+                            Protocol::Ip4(ipv4_addr) => println!("IP address: {}", ipv4_addr),
+                            Protocol::Ip6(ipv6_addr) => println!("IP address: {}", ipv6_addr),
+                            _ => println!("Unsupported protocol"),
                         }
                         
                         swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
