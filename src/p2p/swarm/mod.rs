@@ -2,7 +2,7 @@ use futures::StreamExt;
 use libp2p::multiaddr::Protocol;
 // Import the missing items
 use libp2p::{
-    gossipsub, mdns, noise, swarm::SwarmEvent, tcp, yamux, SwarmBuilder,
+    gossipsub, mdns, noise, swarm::{SwarmEvent, NetworkBehaviour}, tcp, yamux, SwarmBuilder
 };
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
@@ -14,7 +14,7 @@ use tracing_subscriber::EnvFilter;
 /// We create a custom network behaviour that combines Gossipsub and Mdns.
 /// 
 /// 
-#[derive(libp2p::swarm::NetworkBehaviour)]
+#[derive(NetworkBehaviour)]
 struct MyBehavior {
     gossipsub: gossipsub::Behaviour,
     mdns: mdns::tokio::Behaviour,
@@ -95,6 +95,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                     for (peer_id, multiaddr) in list {
                         println!("mDNS discovered a new peer: {peer_id}");
                         
+                        // I need to fetch node name and information
                         // Extract IP address from multiaddr
                         let components: Vec<_> = multiaddr.iter().collect();
                         match components[0] {
@@ -116,10 +117,17 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                     propagation_source: peer_id,
                     message_id: id,
                     message,
-                })) => println!(
+                })) => {
+                    println!(
                         "Got message: '{}' with id: {id} from peer: {peer_id}",
                         String::from_utf8_lossy(&message.data),
-                    ),
+                    );
+                }
+                // SwarmEvent::Behaviour(MyBehaviorEvent::Gossipsub(gossipsub::Event::TopicHash {
+                    
+                // })) => {
+                    
+                // }
                 SwarmEvent::NewListenAddr { address, .. } => {
                     println!("Local node is listening on {address}");
                 }

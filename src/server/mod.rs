@@ -9,7 +9,6 @@ use crate::{config::env::server_port, database::mysql_connection};
 pub mod middleware;
 pub mod multicast;
 pub mod routes;
-pub mod swarm_mdns;
 
 /// Start server options
 /// 

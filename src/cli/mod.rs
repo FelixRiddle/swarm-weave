@@ -2,6 +2,7 @@ use std::error::Error;
 use clap::{Parser, Subcommand};
 
 use crate::database;
+use crate::p2p;
 use crate::server::{
     self,
     StartServerOptions,
@@ -64,7 +65,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             discover
         } => {
             if discover {
-                server::swarm_mdns::main().await?;
+                p2p::hive::main().await?;
             }
         }
     };

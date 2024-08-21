@@ -3,8 +3,8 @@
 'Perseverancia' backend implementation in Rust; This is a general backend for my many apps.
 
 Features:
-* Authentication
-* Nodes detection
+- [ ] Authentication
+- [ ] Nodes detection
 
 <!--
 Original goal:
