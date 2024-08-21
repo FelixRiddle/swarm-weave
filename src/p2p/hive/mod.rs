@@ -93,44 +93,50 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             event = swarm.select_next_some() => match event {
-                // MyBehavior event is an enum created with select!
-                SwarmEvent::Behaviour(MyBehaviorEvent::Mdns(mdns::Event::Discovered(list))) => {
-                    for (peer_id, multiaddr) in list {
-                        println!("mDNS discovered a new peer: {peer_id}");
-                        
-                        // I need to fetch node name and information
-                        // Extract IP address from multiaddr
-                        let components: Vec<_> = multiaddr.iter().collect();
-                        match components[0] {
-                            Protocol::Ip4(ipv4_addr) => println!("IP address: {}", ipv4_addr),
-                            Protocol::Ip6(ipv6_addr) => println!("IP address: {}", ipv6_addr),
-                            _ => println!("Unsupported protocol"),
+                SwarmEvent::Behaviour(event) => {
+                    match event {
+                        // MyBehavior event is an enum created with select!
+                        // MDNS
+                        MyBehaviorEvent::Mdns(event) => {
+                            match event {
+                                mdns::Event::Discovered(list) => {
+                                    for (peer_id, multiaddr) in list {
+                                        println!("mDNS discovered a new peer: {peer_id}");
+                                        
+                                        // I need to fetch node name and information
+                                        // Extract IP address from multiaddr
+                                        let components: Vec<_> = multiaddr.iter().collect();
+                                        match components[0] {
+                                            Protocol::Ip4(ipv4_addr) => println!("IP address: {}", ipv4_addr),
+                                            Protocol::Ip6(ipv6_addr) => println!("IP address: {}", ipv6_addr),
+                                            _ => println!("Unsupported protocol"),
+                                        }
+                                        
+                                        swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                                    }
+                                }
+                                mdns::Event::Expired(list) => {
+                                    for (peer_id, _multiaddr) in list {
+                                        println!("mDNS discover peer has expired: {peer_id}");
+                                        swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                                    }
+                                }
+                            }
                         }
-                        
-                        swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                        // Gossipsub
+                        MyBehaviorEvent::Gossipsub(gossipsub::Event::Message {
+                            propagation_source: peer_id,
+                            message_id: id,
+                            message,
+                        }) => {
+                            println!(
+                                "Got message: '{}' with id: {id} from peer: {peer_id}",
+                                String::from_utf8_lossy(&message.data),
+                            );
+                        }
+                        _ => {}
                     }
                 }
-                SwarmEvent::Behaviour(MyBehaviorEvent::Mdns(mdns::Event::Expired(list))) => {
-                    for (peer_id, _multiaddr) in list {
-                        println!("mDNS discover peer has expired: {peer_id}");
-                        swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
-                    }
-                }
-                SwarmEvent::Behaviour(MyBehaviorEvent::Gossipsub(gossipsub::Event::Message {
-                    propagation_source: peer_id,
-                    message_id: id,
-                    message,
-                })) => {
-                    println!(
-                        "Got message: '{}' with id: {id} from peer: {peer_id}",
-                        String::from_utf8_lossy(&message.data),
-                    );
-                }
-                // SwarmEvent::Behaviour(MyBehaviorEvent::Gossipsub(gossipsub::Event::TopicHash {
-                    
-                // })) => {
-                    
-                // }
                 SwarmEvent::NewListenAddr { address, .. } => {
                     println!("Local node is listening on {address}");
                 }
