@@ -27,11 +27,7 @@ enum Command {
         #[clap(short, long)]
         mysql_connection_string: bool,
     },
-    MDNS {
-        /// Discover nodes
-        #[clap(short, long)]
-        discover: bool,
-    }
+    Hive
 }
 
 /// Main
@@ -61,12 +57,8 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 println!("{}", database::mysql_connection_string());
             }
         }
-        Command::MDNS {
-            discover
-        } => {
-            if discover {
-                p2p::hive::main().await?;
-            }
+        Command::Hive => {
+            p2p::hive::main().await?;
         }
     };
     
