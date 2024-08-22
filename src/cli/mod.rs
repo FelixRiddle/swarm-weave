@@ -1,8 +1,11 @@
-use std::error::Error;
 use clap::{Parser, Subcommand};
+use std::error::Error;
 
 use crate::database;
-use crate::p2p;
+use crate::p2p::{
+    self,
+    hive::HiveParameters,
+};
 use crate::server::{
     self,
     StartServerOptions,
@@ -27,7 +30,8 @@ enum Command {
         #[clap(short, long)]
         mysql_connection_string: bool,
     },
-    Hive
+    /// Hive
+    Hive(HiveParameters)
 }
 
 /// Main
@@ -57,8 +61,8 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 println!("{}", database::mysql_connection_string());
             }
         }
-        Command::Hive => {
-            p2p::hive::main().await?;
+        Command::Hive(params) => {
+            p2p::hive::main(params).await?;
         }
     };
     
