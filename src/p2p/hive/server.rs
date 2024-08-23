@@ -3,6 +3,7 @@
 //! 
 use futures::StreamExt;
 use libp2p_identity::Keypair;
+use libp2p::swarm::{SwarmEvent, NetworkBehaviour};
 use libp2p::{
     autonat,
     gossipsub,
@@ -10,7 +11,6 @@ use libp2p::{
     mdns,
     multiaddr::Protocol,
     noise,
-    swarm::{SwarmEvent, NetworkBehaviour},
     tcp,
     yamux,
     Multiaddr,
@@ -30,7 +30,7 @@ use super::HiveParameters;
 /// 
 /// 
 #[derive(NetworkBehaviour)]
-struct MyBehavior {
+pub struct MyBehavior {
     gossipsub: gossipsub::Behaviour,
     mdns: mdns::tokio::Behaviour,
     identify: identify::Behaviour,
