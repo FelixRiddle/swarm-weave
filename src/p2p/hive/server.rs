@@ -1,13 +1,10 @@
-//! This is considered centralized because it will only run inside my network
+//! This module implements a centralized service using libp2p.
 //! 
-//! 
+//! It combines Gossipsub and mDNS to enable peer discovery and message propagation.
 use futures::StreamExt;
-use libp2p_identity::Keypair;
-use libp2p::swarm::{SwarmEvent, NetworkBehaviour};
+use libp2p::swarm::SwarmEvent;
 use libp2p::{
-    autonat,
     gossipsub,
-    identify,
     mdns,
     multiaddr::Protocol,
     noise,
@@ -16,73 +13,17 @@ use libp2p::{
     Multiaddr,
     SwarmBuilder
 };
-use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
-use std::hash::{Hash, Hasher};
 use std::net::Ipv4Addr;
 use std::time::Duration;
 use tokio::{io, io::AsyncBufReadExt, select};
 use tracing_subscriber::EnvFilter;
 
 use super::HiveParameters;
-
-/// We create a custom network behaviour that combines Gossipsub and Mdns.
-/// 
-/// 
-#[derive(NetworkBehaviour)]
-pub struct MyBehavior {
-    gossipsub: gossipsub::Behaviour,
-    mdns: mdns::tokio::Behaviour,
-    identify: identify::Behaviour,
-    auto_nat: autonat::Behaviour,
-}
-
-impl MyBehavior {
-    /// Create new behavior
-    /// 
-    /// 
-    pub fn new(key: &Keypair) -> Result<Self, Box<dyn Error>> {
-        // To content-address message, we can take the hash of message and use it as an ID.
-        let message_id_fn = |message: &gossipsub::Message| {
-            let mut s = DefaultHasher::new();
-            message.data.hash(&mut s);
-            gossipsub::MessageId::from(s.finish().to_string())
-        };
-        
-        // Set a custom gossipsub configuration
-        let gossipsub_config = gossipsub::ConfigBuilder::default()
-            .heartbeat_interval(Duration::from_secs(10)) // This is set to aid debugging by not cluttering the log space
-            .validation_mode(gossipsub::ValidationMode::Strict) // This sets the kind of message validation. The default is Strict (enforce message signing)
-            .message_id_fn(message_id_fn) // content-address messages. No two messages of the same content will be propagated.
-            .build()
-            .map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))?; // Temporary hack because `build` does not return a proper `std::error::Error`.
-        
-        // build a gossipsub network behaviour
-        let gossipsub = gossipsub::Behaviour::new(
-            gossipsub::MessageAuthenticity::Signed(key.clone()),
-            gossipsub_config,
-        )?;
-        
-        let mdns =
-            mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())?;
-        
-        Ok(MyBehavior {
-            gossipsub,
-            mdns,
-            identify: identify::Behaviour::new(identify::Config::new(
-                "/ipfs/0.1.0".into(),
-                key.public()
-            )),
-            auto_nat: autonat::Behaviour::new(
-                key.public().to_peer_id(),
-                autonat::Config {
-                    only_global_ips: false,
-                    ..Default::default()
-                }
-            )
-        })
-    }
-}
+use super::behavior::{
+    MyBehavior,
+    MyBehaviorEvent,
+};
 
 /// Start service
 /// 
@@ -107,11 +48,11 @@ pub async fn main(_parameters: HiveParameters) -> Result<(), Box<dyn Error>> {
         .build();
     
     // Create a Gossipsub topic
-    let topic = gossipsub::IdentTopic::new("test-net");
+    let topic = gossipsub::IdentTopic::new("chat-net");
     // subscribes to our topic
     swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
     
-    // Read full lines from stdin
+    // Read lines from stdin
     let mut stdin = io::BufReader::new(io::stdin()).lines();
     
     // Listen on all interfaces and whatever port the OS assigns

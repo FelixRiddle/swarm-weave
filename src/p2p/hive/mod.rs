@@ -5,6 +5,7 @@ use libp2p::{
 };
 use std::error::Error;
 
+pub mod behavior;
 pub mod client;
 pub mod server;
 

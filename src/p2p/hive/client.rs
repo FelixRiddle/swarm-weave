@@ -12,8 +12,7 @@ use std::net::Ipv4Addr;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 
-
-use super::server::MyBehavior;
+use super::behavior::MyBehavior;
 use super::HiveParameters;
 
 /// Hive client
