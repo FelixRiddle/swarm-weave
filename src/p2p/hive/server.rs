@@ -1,6 +1,7 @@
 //! This module implements a centralized service using libp2p.
 //! 
 //! It combines Gossipsub and mDNS to enable peer discovery and message propagation.
+use futures::executor::block_on;
 use futures::StreamExt;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{
@@ -15,7 +16,10 @@ use libp2p::{
     SwarmBuilder
 };
 use std::error::Error;
-use std::net::Ipv4Addr;
+use std::net::{
+    Ipv4Addr,
+    Ipv6Addr,
+};
 use std::time::Duration;
 use tokio::{io, io::AsyncBufReadExt, select};
 use tracing_subscriber::EnvFilter;
@@ -39,13 +43,18 @@ pub async fn main(parameters: HiveParameters) -> Result<(), Box<dyn Error>> {
         None => return Err("Key seed is required".into()),
     };
     
+    let port = match parameters.port {
+        Some(port) => port,
+        None => 0,
+    };
+    
     let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .try_init();
     
     let local_key: identity::Keypair = generate_ed25519(key_seed)?;
     
-    let mut swarm = SwarmBuilder::with_new_identity()
+    let mut swarm = SwarmBuilder::with_existing_identity(local_key)
         .with_tokio()
         .with_tcp(
             tcp::Config::default(),
@@ -58,6 +67,27 @@ pub async fn main(parameters: HiveParameters) -> Result<(), Box<dyn Error>> {
         })?
         .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
         .build();
+    
+    // Relay
+    // Listen on all interfaces
+    let listen_addr_tcp = Multiaddr::empty()
+        .with(match parameters.use_ipv6 {
+            Some(true) => Protocol::Ip6(Ipv6Addr::UNSPECIFIED),
+            Some(false) => Protocol::Ip4(Ipv4Addr::UNSPECIFIED),
+            None => Protocol::Ip4(Ipv4Addr::UNSPECIFIED),
+        })
+        .with(Protocol::Tcp(port));
+    swarm.listen_on(listen_addr_tcp)?;
+    
+    let listen_addr_quic = Multiaddr::empty()
+        .with(match parameters.use_ipv6 {
+            Some(true) => Protocol::Ip6(Ipv6Addr::UNSPECIFIED),
+            Some(false) => Protocol::Ip4(Ipv4Addr::UNSPECIFIED),
+            None => Protocol::Ip4(Ipv4Addr::UNSPECIFIED)
+        })
+        .with(Protocol::Udp(port))
+        .with(Protocol::QuicV1);
+    swarm.listen_on(listen_addr_quic)?;
     
     // Create a Gossipsub topic
     let topic = gossipsub::IdentTopic::new("chat-net");
@@ -81,65 +111,69 @@ pub async fn main(parameters: HiveParameters) -> Result<(), Box<dyn Error>> {
     println!("Enter messages via STDIN and they will be sent to connected peers using Gossipsub");
     
     // Kick it off
-    loop {
-        select! {
-            Ok(Some(line)) = stdin.next_line() => {
-                if let Err(e) = swarm
-                    .behaviour_mut().gossipsub
-                    .publish(topic.clone(), line.as_bytes()) {
-                    println!("Publish error: {e:?}");
+    block_on(async {
+        loop {
+            select! {
+                Ok(Some(line)) = stdin.next_line() => {
+                    if let Err(e) = swarm
+                        .behaviour_mut().gossipsub
+                        .publish(topic.clone(), line.as_bytes()) {
+                        println!("Publish error: {e:?}");
+                    }
                 }
-            }
-            event = swarm.select_next_some() => match event {
-                SwarmEvent::Behaviour(event) => {
-                    match event {
-                        // MyBehavior event is an enum created with select!
-                        // MDNS
-                        MyBehaviorEvent::Mdns(event) => {
-                            match event {
-                                mdns::Event::Discovered(list) => {
-                                    for (peer_id, multiaddr) in list {
-                                        println!("mDNS discovered a new peer: {peer_id}");
-                                        
-                                        // I need to fetch node name and information
-                                        // Extract IP address from multiaddr
-                                        let components: Vec<_> = multiaddr.iter().collect();
-                                        match components[0] {
-                                            Protocol::Ip4(ipv4_addr) => println!("IP address: {}", ipv4_addr),
-                                            Protocol::Ip6(ipv6_addr) => println!("IP address: {}", ipv6_addr),
-                                            _ => println!("Unsupported protocol"),
+                event = swarm.select_next_some() => match event {
+                    SwarmEvent::Behaviour(event) => {
+                        match event {
+                            // MyBehavior event is an enum created with select!
+                            // MDNS
+                            MyBehaviorEvent::Mdns(event) => {
+                                match event {
+                                    mdns::Event::Discovered(list) => {
+                                        for (peer_id, multiaddr) in list {
+                                            println!("mDNS discovered a new peer: {peer_id}");
+                                            
+                                            // I need to fetch node name and information
+                                            // Extract IP address from multiaddr
+                                            let components: Vec<_> = multiaddr.iter().collect();
+                                            match components[0] {
+                                                Protocol::Ip4(ipv4_addr) => println!("IP address: {}", ipv4_addr),
+                                                Protocol::Ip6(ipv6_addr) => println!("IP address: {}", ipv6_addr),
+                                                _ => println!("Unsupported protocol"),
+                                            }
+                                            
+                                            swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                                         }
-                                        
-                                        swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
                                     }
-                                }
-                                mdns::Event::Expired(list) => {
-                                    for (peer_id, _multiaddr) in list {
-                                        println!("mDNS discover peer has expired: {peer_id}");
-                                        swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                                    mdns::Event::Expired(list) => {
+                                        for (peer_id, _multiaddr) in list {
+                                            println!("mDNS discover peer has expired: {peer_id}");
+                                            swarm.behaviour_mut().gossipsub.remove_explicit_peer(&peer_id);
+                                        }
                                     }
                                 }
                             }
+                            // Gossipsub
+                            MyBehaviorEvent::Gossipsub(gossipsub::Event::Message {
+                                propagation_source: peer_id,
+                                message_id: id,
+                                message,
+                            }) => {
+                                println!(
+                                    "Got message: '{}' with id: {id} from peer: {peer_id}",
+                                    String::from_utf8_lossy(&message.data),
+                                );
+                            }
+                            _ => {}
                         }
-                        // Gossipsub
-                        MyBehaviorEvent::Gossipsub(gossipsub::Event::Message {
-                            propagation_source: peer_id,
-                            message_id: id,
-                            message,
-                        }) => {
-                            println!(
-                                "Got message: '{}' with id: {id} from peer: {peer_id}",
-                                String::from_utf8_lossy(&message.data),
-                            );
-                        }
-                        _ => {}
                     }
+                    SwarmEvent::NewListenAddr { listener_id, address, } => {
+                        println!("Local node {} is listening on {address}", listener_id.to_string());
+                    }
+                    _ => {}
                 }
-                SwarmEvent::NewListenAddr { listener_id, address, } => {
-                    println!("Local node {} is listening on {address}", listener_id.to_string());
-                }
-                _ => {}
             }
         }
-    }
+    });
+    
+    Ok(())
 }
