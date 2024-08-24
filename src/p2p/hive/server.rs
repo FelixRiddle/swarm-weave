@@ -6,6 +6,7 @@ use futures::StreamExt;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{
     gossipsub,
+    identify,
     identity,
     mdns,
     multiaddr::Protocol,
@@ -54,6 +55,7 @@ pub async fn main(parameters: HiveParameters) -> Result<(), Box<dyn Error>> {
     
     let local_key: identity::Keypair = generate_ed25519(key_seed)?;
     
+    // Create swarm
     let mut swarm = SwarmBuilder::with_existing_identity(local_key)
         .with_tokio()
         .with_tcp(
@@ -123,6 +125,8 @@ pub async fn main(parameters: HiveParameters) -> Result<(), Box<dyn Error>> {
                 }
                 event = swarm.select_next_some() => match event {
                     SwarmEvent::Behaviour(event) => {
+                        println!("{event:?}");
+                        
                         match event {
                             // MyBehavior event is an enum created with select!
                             // MDNS
@@ -162,6 +166,12 @@ pub async fn main(parameters: HiveParameters) -> Result<(), Box<dyn Error>> {
                                     "Got message: '{}' with id: {id} from peer: {peer_id}",
                                     String::from_utf8_lossy(&message.data),
                                 );
+                            }
+                            MyBehaviorEvent::Identify(identify::Event::Received {
+                                info: identify::Info { observed_addr, .. },
+                                ..
+                            }) =>{
+                                swarm.add_external_address(observed_addr.clone());
                             }
                             _ => {}
                         }
