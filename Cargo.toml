@@ -59,6 +59,7 @@ features = [
     "mdns",
     "metrics",
     "noise",
+    "ping",
     "quic",
     "relay",
     "tcp",

@@ -14,11 +14,13 @@ pub struct HiveParameters {
     #[clap(short, long)]
     pub server: bool,
     #[clap(short, long)]
-    pub listen_port: Option<u16>,
+    pub port: Option<u16>,
     #[clap(long)]
     pub server_address: Option<Multiaddr>,
     #[clap(long)]
     pub server_peer_id: Option<PeerId>,
+    #[clap(long)]
+    pub key_seed: Option<u8>,
 }
 
 /// Main function

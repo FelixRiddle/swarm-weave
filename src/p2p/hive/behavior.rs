@@ -4,7 +4,10 @@ use libp2p::{
     autonat,
     gossipsub,
     identify,
+    identity,
     mdns,
+    ping,
+    relay,
 };
 use std::collections::hash_map::DefaultHasher;
 use std::error::Error;
@@ -12,15 +15,27 @@ use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::io;
 
+/// Generate ed25519
+/// 
+/// 
+pub fn generate_ed25519(secret_key_seed: u8) -> Result<identity::Keypair, Box<dyn Error>> {
+    let mut bytes = [0u8; 32];
+    bytes[0] = secret_key_seed;
+    
+    Ok(identity::Keypair::ed25519_from_bytes(bytes)?)
+}
+
 /// We create a custom network behaviour that combines Gossipsub and Mdns.
 /// 
 /// This macro creates 'MyBehaviorEvent'
 #[derive(NetworkBehaviour)]
 pub struct MyBehavior {
-    pub gossipsub: gossipsub::Behaviour,
-    pub mdns: mdns::tokio::Behaviour,
-    pub identify: identify::Behaviour,
     pub auto_nat: autonat::Behaviour,
+    pub gossipsub: gossipsub::Behaviour,
+    pub identify: identify::Behaviour,
+    pub mdns: mdns::tokio::Behaviour,
+    pub ping: ping::Behaviour,
+    pub relay: relay::Behaviour,
 }
 
 impl MyBehavior {
@@ -53,19 +68,21 @@ impl MyBehavior {
             mdns::tokio::Behaviour::new(mdns::Config::default(), key.public().to_peer_id())?;
         
         Ok(MyBehavior {
-            gossipsub,
-            mdns,
-            identify: identify::Behaviour::new(identify::Config::new(
-                "/ipfs/0.1.0".into(),
-                key.public()
-            )),
             auto_nat: autonat::Behaviour::new(
                 key.public().to_peer_id(),
                 autonat::Config {
                     only_global_ips: false,
                     ..Default::default()
                 }
-            )
+            ),
+            gossipsub,
+            mdns,
+            identify: identify::Behaviour::new(identify::Config::new(
+                "/ipfs/0.1.0".into(),
+                key.public()
+            )),
+            relay: relay::Behaviour::new(key.public().to_peer_id(), Default::default()),
+            ping: ping::Behaviour::new(ping::Config::new()),
         })
     }
 }

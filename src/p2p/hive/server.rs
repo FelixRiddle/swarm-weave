@@ -5,6 +5,7 @@ use futures::StreamExt;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{
     gossipsub,
+    identity,
     mdns,
     multiaddr::Protocol,
     noise,
@@ -19,6 +20,8 @@ use std::time::Duration;
 use tokio::{io, io::AsyncBufReadExt, select};
 use tracing_subscriber::EnvFilter;
 
+use crate::p2p::hive::behavior::generate_ed25519;
+
 use super::HiveParameters;
 use super::behavior::{
     MyBehavior,
@@ -28,10 +31,19 @@ use super::behavior::{
 /// Start service
 /// 
 /// 
-pub async fn main(_parameters: HiveParameters) -> Result<(), Box<dyn Error>> {
+pub async fn main(parameters: HiveParameters) -> Result<(), Box<dyn Error>> {
+    
+    // Fetch key seed
+    let key_seed = match parameters.key_seed {
+        Some(seed) => seed,
+        None => return Err("Key seed is required".into()),
+    };
+    
     let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .try_init();
+    
+    let local_key: identity::Keypair = generate_ed25519(key_seed)?;
     
     let mut swarm = SwarmBuilder::with_new_identity()
         .with_tokio()

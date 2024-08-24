@@ -48,7 +48,7 @@ pub async fn main(parameters: HiveParameters) -> Result<(), Box<dyn Error>> {
     swarm.listen_on(
         Multiaddr::empty()
             .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
-            .with(Protocol::Tcp(parameters.listen_port.unwrap_or(0)))
+            .with(Protocol::Tcp(parameters.port.unwrap_or(0)))
     )?;
     
     // // Auto nat seems to not exist, dropping it sadly
