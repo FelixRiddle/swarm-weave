@@ -3,9 +3,9 @@ use libp2p::{
     multiaddr::Multiaddr,
     PeerId,
 };
+use rand::Rng;
 use std::error::Error;
 
-pub mod behavior;
 pub mod client;
 pub mod server;
 
@@ -29,6 +29,22 @@ pub struct HiveParameters {
     /// Whether to use IPV6 or IPV4
     #[clap(long)]
     pub use_ipv6: Option<bool>,
+}
+
+impl Default for HiveParameters {
+    fn default() -> Self {
+        let mut rng = rand::thread_rng();
+        let key_seed = rng.gen::<u8>();
+
+        HiveParameters {
+            server: true,
+            port: None,
+            server_address: None,
+            server_peer_id: None,
+            key_seed: Some(key_seed),
+            use_ipv6: None,
+        }
+    }
 }
 
 /// Main function

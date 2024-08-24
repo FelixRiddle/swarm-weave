@@ -3,4 +3,5 @@
 //! Hive: Centralized p2p
 //! Swarm: Decentralized p2p
 pub mod hive;
+pub mod node;
 pub mod swarm;
