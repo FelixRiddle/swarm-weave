@@ -29,6 +29,9 @@ pub struct HiveParameters {
     /// Whether to use IPV6 or IPV4
     #[clap(long)]
     pub use_ipv6: Option<bool>,
+    /// Whether it's relay or not
+    #[clap(long)]
+    pub relay: bool,
 }
 
 impl Default for HiveParameters {
@@ -43,6 +46,7 @@ impl Default for HiveParameters {
             server_peer_id: None,
             key_seed: Some(key_seed),
             use_ipv6: None,
+            relay: false,
         }
     }
 }

@@ -87,25 +87,28 @@ impl Node {
         };
         
         // Relay
-        // Listen on all interfaces
-        let listen_addr_tcp = Multiaddr::empty()
-            .with(match self.parameters.use_ipv6 {
-                Some(true) => Protocol::Ip6(Ipv6Addr::UNSPECIFIED),
-                Some(false) => Protocol::Ip4(Ipv4Addr::UNSPECIFIED),
-                None => Protocol::Ip4(Ipv4Addr::UNSPECIFIED),
-            })
-            .with(Protocol::Tcp(port));
-        self.swarm.listen_on(listen_addr_tcp)?;
-        
-        let listen_addr_quic = Multiaddr::empty()
-            .with(match self.parameters.use_ipv6 {
-                Some(true) => Protocol::Ip6(Ipv6Addr::UNSPECIFIED),
-                Some(false) => Protocol::Ip4(Ipv4Addr::UNSPECIFIED),
-                None => Protocol::Ip4(Ipv4Addr::UNSPECIFIED)
-            })
-            .with(Protocol::Udp(port))
-            .with(Protocol::QuicV1);
-        self.swarm.listen_on(listen_addr_quic)?;
+        if self.parameters.relay {
+            // Listen on all interfaces
+            let listen_addr_tcp = Multiaddr::empty()
+                .with(match self.parameters.use_ipv6 {
+                    Some(true) => Protocol::Ip6(Ipv6Addr::UNSPECIFIED),
+                    Some(false) => Protocol::Ip4(Ipv4Addr::UNSPECIFIED),
+                    None => Protocol::Ip4(Ipv4Addr::UNSPECIFIED),
+                })
+                .with(Protocol::Tcp(port));
+            self.swarm.listen_on(listen_addr_tcp)?;
+            
+            let listen_addr_quic = Multiaddr::empty()
+                .with(match self.parameters.use_ipv6 {
+                    Some(true) => Protocol::Ip6(Ipv6Addr::UNSPECIFIED),
+                    Some(false) => Protocol::Ip4(Ipv4Addr::UNSPECIFIED),
+                    None => Protocol::Ip4(Ipv4Addr::UNSPECIFIED)
+                })
+                .with(Protocol::Udp(port))
+                .with(Protocol::QuicV1);
+            
+            self.swarm.listen_on(listen_addr_quic)?;
+        }
         
         // Read lines from stdin
         let mut stdin = io::BufReader::new(io::stdin()).lines();
@@ -178,11 +181,23 @@ impl Node {
                                         String::from_utf8_lossy(&message.data),
                                     );
                                 }
-                                MyBehaviorEvent::Identify(identify::Event::Received {
-                                    info: identify::Info { observed_addr, .. },
-                                    ..
-                                }) =>{
-                                    self.swarm.add_external_address(observed_addr.clone());
+                                // Add relay nodes
+                                MyBehaviorEvent::Identify(event) => {
+                                    match event {
+                                        identify::Event::Received {
+                                            info,
+                                            ..
+                                        } => {
+                                            let observed_addr = info.observed_addr;
+                                            
+                                            // If we're a relay node, add the peer's address to our swarm
+                                            // If we're not a relay node, we don't need to do anything here
+                                            if self.parameters.relay {
+                                                self.swarm.add_external_address(observed_addr.clone());
+                                            }
+                                        }
+                                        _ => { }
+                                    };
                                 }
                                 _ => {}
                             }
