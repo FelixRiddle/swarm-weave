@@ -26,7 +26,7 @@ impl HiveFolderTestSuite {
 
     pub fn path(&self) -> PathBuf {
         let mut path = PathBuf::from(&self.test_folder.path);
-        path.push(&self.suite_uuid);
+        path.push(format!("suite_{}", &self.suite_uuid));
         path
     }
     

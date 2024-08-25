@@ -29,18 +29,15 @@ impl HiveServerNode {
         
         // Server node path
         let mut path = test_suite.path();
+        fs::create_dir(&path)?;
+        
         path.push(node_name.clone());
+        fs::create_dir(&path)?;
         
         // Create server node
         let server_node = Self { ip, port, node_name, test_suite, path };
-        server_node.create_dir()?;
         
         Ok(server_node)
-    }
-    
-    fn create_dir(&self) -> std::io::Result<()> {
-        fs::create_dir_all(&self.path)?;
-        Ok(())
     }
     
     pub fn save_config(&self) -> std::io::Result<()> {
@@ -54,7 +51,7 @@ impl HiveServerNode {
 mod tests {
     use super::*;
     use crate::test::folder::hive_test_folder::HiveTestFolder;
-
+    
     #[test]
     fn test_hive_server_node_creation() {
         let test_suite = HiveFolderTestSuite::new(HiveTestFolder::default());
