@@ -1,7 +1,6 @@
 //! Distributed computing server using Actix-web and multicast discovery
 //! 
 //! 
-use config::env::set_debug;
 use dotenv::dotenv;
 use std::error::Error;
 use tokio;
@@ -15,6 +14,10 @@ pub mod p2p;
 pub mod security;
 pub mod server;
 pub mod server_node;
+pub mod test;
+
+#[cfg(debug_assertions)]
+use config::env::set_debug;
 
 /// Main function
 /// 
@@ -24,6 +27,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     // Parse environment variables
     dotenv().ok();
     
+    #[cfg(debug_assertions)]
     set_debug();
     
     cli::main().await?;
