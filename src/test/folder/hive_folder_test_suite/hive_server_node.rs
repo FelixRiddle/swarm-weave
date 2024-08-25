@@ -42,7 +42,10 @@ impl HiveServerNode {
     
     pub fn save_config(&self) -> std::io::Result<()> {
         let config = serde_json::to_string(self)?;
-        std::fs::write(&self.path, config)?;
+        
+        let config_file = self.path.join("config.json");
+        
+        std::fs::write(&config_file, config)?;
         Ok(())
     }
 }
@@ -62,5 +65,7 @@ mod tests {
         assert!(server_node.node_name.len() > 0);
         assert!(server_node.path.to_str().unwrap().ends_with(&server_node.node_name));
         assert!(server_node.path.exists()); // Assert the path exists
+        
+        server_node.save_config().unwrap();
     }
 }
