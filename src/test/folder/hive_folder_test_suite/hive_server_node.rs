@@ -19,6 +19,9 @@ pub struct HiveServerNode {
 }
 
 impl HiveServerNode {
+    /// Create hive server node
+    /// 
+    /// 
     pub fn new(test_suite: HiveFolderTestSuite, ip: String, port: u16) -> Result<Self, Box<dyn Error>> {
         // Generate random name
         let mut generator = Generator::default();
@@ -37,9 +40,16 @@ impl HiveServerNode {
         // Create server node
         let server_node = Self { ip, port, node_name, test_suite, path };
         
+        // Create log path
+        let path = server_node.get_log_folder();
+        fs::create_dir(&path)?;
+        
         Ok(server_node)
     }
     
+    /// Save configuration
+    /// 
+    /// 
     pub fn save_config(&self) -> std::io::Result<()> {
         let config = serde_json::to_string(self)?;
         
@@ -47,6 +57,13 @@ impl HiveServerNode {
         
         std::fs::write(&config_file, config)?;
         Ok(())
+    }
+    
+    /// Get log folder
+    /// 
+    /// 
+    pub fn get_log_folder(&self) -> PathBuf {
+        self.path.join("logs")
     }
 }
 

@@ -23,6 +23,7 @@ use tokio::{io, io::AsyncBufReadExt, select};
 use tracing_subscriber::EnvFilter;
 
 use crate::p2p::hive::HiveParameters;
+use crate::test::folder::hive_folder_test_suite::hive_server_node::HiveServerNode;
 
 pub mod behavior;
 
@@ -36,6 +37,8 @@ pub struct Node {
     pub local_key: identity::Keypair,
     pub swarm: libp2p::Swarm<MyBehavior>,
     pub topic: gossipsub::IdentTopic,
+    // Test handler to manage testing information
+    pub test_handler: Option<HiveServerNode>,
 }
 
 impl Node {
@@ -46,6 +49,7 @@ impl Node {
             None => return Err("Key seed is required".into()),
         };
         
+        // Logger
         let _ = tracing_subscriber::fmt()
             .with_env_filter(EnvFilter::from_default_env())
             .try_init();
@@ -77,14 +81,70 @@ impl Node {
             local_key,
             swarm,
             topic,
+            test_handler: None,
         })
     }
-
-    pub async fn start(&mut self) -> Result<(), Box<dyn Error>> {
-        let port = match self.parameters.port {
-            Some(port) => port,
-            None => 0,
+    
+    /// New with test handler
+    /// 
+    /// 
+    pub async fn new_with_test_handler(
+        parameters: HiveParameters,
+        test_handler: HiveServerNode,
+    ) -> Result<Self, Box<dyn Error>> {
+        // Fetch key seed
+        let key_seed = match parameters.key_seed {
+            Some(seed) => seed,
+            None => return Err("Key seed is required".into()),
         };
+        
+        // Logger, because we know we have a test handler, we want to write logs to a folder
+        let file_appender = tracing_appender::rolling::daily(test_handler.get_log_folder(), "log");
+        let (non_blocking_writer, _guard) = tracing_appender::non_blocking(file_appender);
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_writer(non_blocking_writer)
+            .init();
+        
+        // Create swarm
+        let local_key: identity::Keypair = generate_ed25519(key_seed)?;
+        let mut swarm = SwarmBuilder::with_existing_identity(local_key.clone())
+            .with_tokio()
+            .with_tcp(
+                tcp::Config::default(),
+                noise::Config::new,
+                yamux::Config::default,
+            )?
+            .with_quic()
+            .with_behaviour(|key| {
+                Ok(MyBehavior::new(key).unwrap())
+            })?
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
+            .build();
+        
+        // Create a Gossipsub topic
+        let topic = gossipsub::IdentTopic::new("chat-net");
+        // subscribes to our topic
+        swarm.behaviour_mut().gossipsub.subscribe(&topic)?;
+        
+        Ok(Node {
+            parameters,
+            local_key,
+            swarm,
+            topic,
+            test_handler: None,
+        })
+    }
+    
+    /// Set test handler
+    /// 
+    /// 
+    pub fn set_test_handler(&mut self, test_handler: HiveServerNode) {
+        self.test_handler = Some(test_handler);
+    }
+    
+    pub async fn start(&mut self) -> Result<(), Box<dyn Error>> {
+        let port = self.parameters.get_port();
         
         // Relay
         if self.parameters.relay {

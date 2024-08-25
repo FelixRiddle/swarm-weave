@@ -51,6 +51,22 @@ impl Default for HiveParameters {
     }
 }
 
+impl HiveParameters {
+    pub fn generate_peer_id(&self) -> Result<PeerId, Box<dyn Error>> {
+        let key = libp2p::identity::Keypair::generate_ed25519();
+        Ok(key.public().to_peer_id())
+    }
+    
+    pub fn get_port(&self) -> u16 {
+        let port = match self.port {
+            Some(port) => port,
+            None => 0,
+        };
+        
+        port
+    }
+}
+
 /// Main function
 /// 
 /// 
