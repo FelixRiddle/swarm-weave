@@ -49,3 +49,21 @@ impl HiveServerNode {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test::folder::hive_test_folder::HiveTestFolder;
+
+    #[test]
+    fn test_hive_server_node_creation() {
+        let test_suite = HiveFolderTestSuite::new(HiveTestFolder::default());
+        let server_node = HiveServerNode::new(test_suite.clone(), "127.0.0.1".to_string(), 8080).unwrap();
+        
+        assert!(server_node.ip == "127.0.0.1");
+        assert!(server_node.port == 8080);
+        assert!(server_node.node_name.len() > 0);
+        assert!(server_node.path.to_str().unwrap().ends_with(&server_node.node_name));
+        assert!(server_node.path.exists()); // Assert the path exists
+    }
+}
