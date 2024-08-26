@@ -1,7 +1,7 @@
 //! Differences between hive and swarm
 //! 
-//! Hive: Centralized p2p
-//! Swarm: Decentralized p2p
+//! Hive: Private p2p
+//! Swarm: Decentralized and public p2p services
 pub mod hive;
 pub mod node;
 pub mod swarm;
