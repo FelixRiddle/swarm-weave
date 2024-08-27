@@ -23,7 +23,7 @@ struct LocationRequest {
 
 /// Create server node
 /// 
-/// 
+/// TODO: Get location information and store on the database
 async fn post_location(_req: HttpRequest, body: web::Json<LocationRequest>) -> impl Responder {
     let location = body.location.clone();
     // Process the location here

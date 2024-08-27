@@ -6,7 +6,7 @@ use crate::p2p::{
     self,
     hive::HiveParameters,
 };
-use crate::server::{
+use crate::server::api::{
     self,
     StartServerOptions,
 };
@@ -47,7 +47,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             
             options.port = port.unwrap_or(options.port);
             
-            if let Err(e) = server::start_server(options).await {
+            if let Err(e) = api::start_server(options).await {
                 eprintln!("Error starting server: {}", e);
             } else {
                 println!("Server closed");

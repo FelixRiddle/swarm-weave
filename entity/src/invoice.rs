@@ -19,27 +19,27 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::invoice_product_junction::Entity")]
-    InvoiceProductJunction,
     #[sea_orm(
-        belongs_to = "super::user::Entity",
+        belongs_to = "super::users::Entity",
         from = "Column::UserId",
-        to = "super::user::Column::Id",
+        to = "super::users::Column::Id",
         on_update = "Cascade",
         on_delete = "SetNull"
     )]
-    User,
+    Users,
+    #[sea_orm(has_many = "super::invoice_product_junction::Entity")]
+    InvoiceProductJunction,
+}
+
+impl Related<super::users::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Users.def()
+    }
 }
 
 impl Related<super::invoice_product_junction::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::InvoiceProductJunction.def()
-    }
-}
-
-impl Related<super::user::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::User.def()
     }
 }
 

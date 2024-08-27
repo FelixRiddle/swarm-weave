@@ -301,8 +301,13 @@ impl Node {
     }
 }
 
+/// Really hard to test
+/// 
+/// 
 #[cfg(test)]
 mod tests {
+    // use std::str::FromStr;
+
     use super::*;
     // use libp2p::identity::Keypair;
     // use libp2p::swarm::Swarm;
@@ -367,58 +372,6 @@ mod tests {
     }
     
     // TODO: Test that the chat works, by starting two nodes and sending a private key or something
+    
     // TODO: Test that the relay works
-
-    // #[tokio::test]
-    // async fn test_start_node() {
-    //     // Initialize Node with valid parameters
-    //     let parameters = HiveParameters {
-    //         key_seed: Some("test_key_seed".to_string()),
-    //         relay: true,
-    //         use_ipv6: Some(false),
-    //         port: 1234,
-    //     };
-
-    //     let mut node = Node {
-    //         parameters,
-    //         local_key: Keypair::generate(),
-    //         swarm: Swarm::new(
-    //             libp2p::NetworkConfig::new(PeerId::random()),
-    //             libp2p::TransportConfig::new(TcpConfig::new(), YamuxConfig::default()),
-    //             libp2p::BehaviourConfig::new(MyBehavior::new),
-    //             NoiseConfig::new(),
-    //         ),
-    //         topic: IdentTopic::new("chat-net"),
-    //         test_handler: None,
-    //     };
-
-    //     // Simulate user input for stdin
-    //     let mut stdin = futures::stream::iter(vec![
-    //         Ok("Hello, world!".to_string()),
-    //         Ok("Goodbye, world!".to_string()),
-    //     ]);
-
-    //     // Simulate swarm events
-    //     let mut swarm_events = futures::stream::iter(vec![
-    //         SwarmEvent::Behaviour(MyBehaviorEvent::Mdns(Event::Discovered(vec![
-    //             (PeerId::random(), Multiaddr::from_str("/ip4/127.0.0.1/tcp/1234").unwrap()),
-    //         ]))),
-    //         SwarmEvent::Behaviour(MyBehaviorEvent::Gossipsub(gossipsub::Event::Message {
-    //             propagation_source: PeerId::random(),
-    //             message_id: 1,
-    //             message: gossipsub::Message {
-    //                 topic: IdentTopic::new("chat-net"),
-    //                 data: "Hello, world!".as_bytes().to_vec(),
-    //             },
-    //         })),
-    //         SwarmEvent::NewListenAddr {
-    //             listener_id: 1,
-    //             address: Multiaddr::from_str("/ip4/127.0.0.1/tcp/1234").unwrap(),
-    //         },
-    //     ]);
-
-    //     // Test start function
-    //     let result = node.start_with_input_and_events(&mut stdin, &mut swarm_events).await;
-    //     assert!(result.is_ok());
-    // }
 }

@@ -30,6 +30,14 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
+        belongs_to = "super::users::Entity",
+        from = "Column::UserId",
+        to = "super::users::Column::Id",
+        on_update = "Cascade",
+        on_delete = "SetNull"
+    )]
+    Users,
+    #[sea_orm(
         belongs_to = "super::address::Entity",
         from = "Column::AddressId",
         to = "super::address::Column::Id",
@@ -49,14 +57,12 @@ pub enum Relation {
     Groups,
     #[sea_orm(has_many = "super::meeti_participants::Entity")]
     MeetiParticipants,
-    #[sea_orm(
-        belongs_to = "super::user::Entity",
-        from = "Column::UserId",
-        to = "super::user::Column::Id",
-        on_update = "Cascade",
-        on_delete = "SetNull"
-    )]
-    User,
+}
+
+impl Related<super::users::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Users.def()
+    }
 }
 
 impl Related<super::address::Entity> for Entity {
@@ -80,12 +86,6 @@ impl Related<super::groups::Entity> for Entity {
 impl Related<super::meeti_participants::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::MeetiParticipants.def()
-    }
-}
-
-impl Related<super::user::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::User.def()
     }
 }
 
