@@ -3,11 +3,20 @@ use chrono::{
     Utc
 };
 use std::error::Error;
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, DatabaseConnection, DbBackend, DbErr, QueryFilter
+};
 use serde::{Deserialize, Serialize};
 use sysinfo::{
     Disks, System
 };
-
+use entity::{
+    sea_orm_active_enums::Status,
+    system_resources,
+    system_core,
+    system_memory,
+    storage_device,
+};
 use super::storage::Storage;
 
 #[derive(Deserialize, Serialize)]
@@ -32,14 +41,9 @@ pub struct Memory {
 }
 
 impl Resources {
-    pub fn total_cores(&self) -> u32 {
-        self.cpus.len() as u32
-    }
-    
-    pub fn total_storage_usage_percentage(&self) -> f64 {
-        self.storage.iter().map(|storage| storage.usage_percentage()).sum::<f64>() / self.storage.len() as f64
-    }
-    
+    /// Fetch system resources and create a new Resources instance
+    /// 
+    /// 
     pub fn fetch_resources() -> Result<Resources, Box<dyn Error>> {
         let sys = System::new_all();
         
@@ -73,6 +77,56 @@ impl Resources {
             storage: storages,
             eval_time: Utc::now(),
         })
+    }
+    
+    pub fn total_cores(&self) -> u32 {
+        self.cpus.len() as u32
+    }
+    
+    pub fn total_storage_usage_percentage(&self) -> f64 {
+        self.storage.iter().map(|storage| storage.usage_percentage()).sum::<f64>() / self.storage.len() as f64
+    }
+    
+    /// Insert data
+    /// 
+    /// 
+    pub async fn insert_data(db: &DatabaseConnection) -> Result<(), Box<dyn Error>> {
+        let resources = Resources::fetch_resources()?;
+        
+        // Create and insert resources
+        let system_resources_instance = system_resources::ActiveModel {
+            eval_time: ActiveValue::Set(resources.eval_time.naive_utc()),
+           ..Default::default() // all other attributes are `NotSet`
+        };
+        let system_resources_id = system_resources_instance.insert(db).await?.id;
+        
+        // TODO: Create it like system_resources_instance
+        let system_core_instances: Vec<_> = resources.cpus.iter().map(|cpu| {
+            // Create system core
+            let system_core_instance = system_core::ActiveModel {
+                eval_time: ActiveValue::Set(resources.eval_time.naive_utc()),
+               ..Default::default() // all other attributes are `NotSet`
+            };
+            system_core::Model::new(cpu.usage_percentage, cpu.free_percentage, system_resources_id)
+        }).collect();
+        let system_core_ids: Vec<_> = futures::stream::iter(system_core_instances)
+            .map(|instance| instance.save(db))
+            .collect::<Vec<_>>()
+            .await?
+            .into_iter()
+            .map(|result| result.id)
+            .collect();
+        
+        let system_memory_instance = system_memory::Model::new(resources.memory.total, resources.memory.used, resources.memory.free, system_resources_id);
+        let system_memory_id = system_memory_instance.save(db).await?.id;
+        
+        // Insert storage data
+        for storage in &resources.storage {
+            let storage_instance = storage_device::Model::new(storage.name.clone(), storage.total, storage.used, storage.free, system_resources_id);
+            storage_instance.save(db).await?;
+        }
+        
+        Ok(())
     }
 }
 

@@ -22,6 +22,12 @@ SECRET_TOKEN=super-secret
 
 # MySQL database
 MYSQL_DATABASE_NAME=perseverancia-development
+
+# Testing
+MYSQL_TEST_DATABASE_NAME=perseverancia-testing
+MYSQL_TEST_DATABASE=perseverancia-testing
+
+# Connection
 MYSQL_USERNAME=root
 MYSQL_PASSWORD=123
 MYSQL_HOST=localhost

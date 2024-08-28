@@ -104,10 +104,10 @@ pub fn mysql_port() -> String {
     env::var("MYSQL_PORT").unwrap_or_else(|_| "3306".to_string())
 }
 
-/// Database
+/// Get mysql database name
 /// 
 /// 
-pub fn mysql_database() -> String {
+fn get_mysql_database_name() -> String {
     match env::var("MYSQL_DATABASE") {
         Ok(db_name) => return db_name.to_string(),
         Err(_) => { }
@@ -121,9 +121,42 @@ pub fn mysql_database() -> String {
     // Check debug first
     if is_development() {
         return "perseverancia-development".to_string();
-    } else {
-        return "perseverancia-production".to_string();
     }
+    
+    "perseverancia-production".to_string()
+}
+
+/// Get test database name
+/// 
+/// 
+fn get_test_database_name() -> String {
+    match env::var("MYSQL_TEST_DATABASE") {
+        Ok(db_name) => return db_name.to_string(),
+        Err(_) => { }
+    };
+    
+    match env::var("MYSQL_TEST_DATABASE_NAME") {
+        Ok(db_name) => return db_name.to_string(),
+        Err(_) => { }
+    };
+    
+    "perseverancia-testing".to_string()
+}
+
+/// Database
+/// 
+/// 
+pub fn mysql_database() -> String {
+    // Check if it's testing
+    if cfg!(test) {
+        let db_name = get_test_database_name();
+        
+        return db_name;
+    }
+    
+    // Get database name
+    // TODO: Split development database from production
+    get_mysql_database_name()
 }
 
 /// Secret token

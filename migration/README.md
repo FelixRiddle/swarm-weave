@@ -1,3 +1,9 @@
+# WARNING:
+
+Migrations here are deprecated please use the repository 'sequelize-migrations' and will be required to have node installed.
+
+This makes workflow so much easier and faster.
+
 # Running Migrator CLI
 
 - Generate a new migration file
