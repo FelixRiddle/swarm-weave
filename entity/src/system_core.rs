@@ -2,15 +2,15 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "system-core")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    #[sea_orm(column_name = "usagePercentage")]
-    pub usage_percentage: i64,
-    #[sea_orm(column_name = "freePercentage")]
-    pub free_percentage: i64,
+    #[sea_orm(column_name = "usagePercentage", column_type = "Float")]
+    pub usage_percentage: f32,
+    #[sea_orm(column_name = "freePercentage", column_type = "Float")]
+    pub free_percentage: f32,
     #[sea_orm(column_name = "systemResourceId")]
     pub system_resource_id: Option<i64>,
 }

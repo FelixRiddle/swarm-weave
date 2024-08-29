@@ -1,5 +1,10 @@
 # Priority TODO
 
+2024/08/28
+Database data types are wrong for CPU, they were in Bigint format, but it should be Float
+- [x] Change model data types
+- [ ] Create migration
+
 # Version 1.0.0
 
 This will be the main functionality, features should be considered optional.
