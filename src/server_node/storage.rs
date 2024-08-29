@@ -12,8 +12,9 @@ pub enum DiskKind {
 
 #[derive(Serialize, Deserialize)]
 pub struct Storage {
-    pub total: f64,
-    pub used: f64,
+    // In bytes
+    pub total: u64,
+    pub used: u64,
     pub kind: DiskKind,
     pub name: String,
     pub is_removable: bool,
@@ -27,8 +28,8 @@ impl Storage {
         };
         
         Ok(Self {
-            total: disk.total_space() as f64,
-            used: (disk.total_space() - disk.available_space()) as f64,
+            total: disk.total_space(),
+            used: (disk.total_space() - disk.available_space()),
             kind: match disk.kind() {
                 SysDiskKind::HDD => DiskKind::HDD,
                 SysDiskKind::SSD => DiskKind::SSD,
@@ -39,11 +40,11 @@ impl Storage {
         })
     }
     
-    pub fn usage_percentage(&self) -> f64 {
-        (self.used / self.total) * 100.0
+    pub fn usage_percentage(&self) -> u64 {
+        (self.used / self.total) * 100
     }
     
-    pub fn available_space(&self) -> f64 {
+    pub fn available_space(&self) -> u64 {
         self.total - self.used
     }
 }
@@ -51,28 +52,28 @@ impl Storage {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    
     #[test]
     fn test_storage_usage_percentage() {
         let storage = Storage {
-            total: 100.0,
-            used: 50.0,
+            total: 100,
+            used: 50,
             kind: DiskKind::HDD,
             name: "sda1".to_string(),
             is_removable: true,
         };
-        assert_eq!(storage.usage_percentage(), 50.0);
+        assert_eq!(storage.usage_percentage(), 50);
     }
-
+    
     #[test]
     fn test_storage_available_space() {
         let storage = Storage {
-            total: 100.0,
-            used: 50.0,
+            total: 100,
+            used: 50,
             kind: DiskKind::HDD,
             name: "sda1".to_string(),
             is_removable: true,
         };
-        assert_eq!(storage.available_space(), 50.0);
+        assert_eq!(storage.available_space(), 50);
     }
 }

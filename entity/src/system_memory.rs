@@ -9,7 +9,6 @@ pub struct Model {
     pub id: i64,
     pub total: i64,
     pub used: i64,
-    pub free: i64,
     #[sea_orm(column_name = "systemResourceId")]
     pub system_resource_id: Option<i64>,
 }

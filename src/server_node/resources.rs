@@ -113,9 +113,9 @@ impl Resources {
         self.cpus.len() as u32
     }
     
-    pub fn total_storage_usage_percentage(&self) -> f64 {
-        self.storage.iter().map(|storage| storage.usage_percentage()).sum::<f64>() / self.storage.len() as f64
-    }
+    // pub fn total_storage_usage_percentage(&self) -> i64 {
+    //     self.storage.iter().map(|storage| storage.usage_percentage()).sum::<i64>() / self.storage.len()
+    // }
     
     /// Insert data
     /// 
@@ -134,35 +134,31 @@ impl Resources {
         let system_core_instances: Result<Vec<system_core::ActiveModel>, Box<dyn Error>> = resources.cpus.iter().map(|cpu| {
             create_system_core_instance(cpu, system_resources_id)
         }).collect();
-        
         let system_core_instances = system_core_instances?;
-        
         for system_core_instance in system_core_instances {
             system_core_instance.insert(db).await?;
         }
         
-        // // System memory instance
-        // let system_memory_instance = system_memory::ActiveModel {
-        //     total: ActiveValue::Set(resources.memory.total),
-        //     used: ActiveValue::Set(resources.memory.used),
-        //     free: ActiveValue::Set(resources.memory.free),
-        //     system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-        //    ..Default::default()
-        // };
+        // System memory instance
+        let system_memory_instance = system_memory::ActiveModel {
+            total: ActiveValue::Set(i64::try_from(resources.memory.total)?),
+            used: ActiveValue::Set(i64::try_from(resources.memory.used)?),
+            system_resource_id: ActiveValue::Set(Some(system_resources_id)),
+           ..Default::default()
+        };
+        system_memory_instance.insert(db).await?;
         
-        // // system_memory::Model::new(
-        // //     resources.memory.total,
-        // //     resources.memory.used,
-        // //     resources.memory.free,
-        // //     system_resources_id
-        // // );
-        // let system_memory_id = system_memory_instance.save(db).await?.id;
-        
-        // // Insert storage data
-        // for storage in &resources.storage {
-        //     let storage_instance = storage_device::Model::new(storage.name.clone(), storage.total, storage.used, storage.free, system_resources_id);
-        //     storage_instance.save(db).await?;
-        // }
+        // Insert storage data
+        for storage in &resources.storage {
+            let storage_instance = storage_device::ActiveModel {
+                name: ActiveValue::Set(storage.name.clone()),
+                total: ActiveValue::Set(i64::try_from(storage.total)?),
+                used: ActiveValue::Set(i64::try_from(storage.used)?),
+                system_resource_id: ActiveValue::Set(Some(system_resources_id)),
+               ..Default::default()
+            };
+            storage_instance.save(db).await?;
+        }
         
         Ok(())
     }
@@ -184,11 +180,5 @@ mod tests {
     fn test_total_cores() {
         let resources = Resources::fetch_resources().unwrap();
         assert!(resources.total_cores() > 0);
-    }
-
-    #[test]
-    fn test_storage_usage_percentage() {
-        let resources = Resources::fetch_resources().unwrap();
-        assert!(resources.total_storage_usage_percentage() >= 0.0 && resources.total_storage_usage_percentage() <= 100.0);
     }
 }
