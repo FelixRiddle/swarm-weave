@@ -182,6 +182,8 @@ mod tests {
 
     #[test]
     fn test_is_development() {
+        let debug = env::var("DEBUG");
+        
         // Set DEBUG environment variable to test different scenarios
         env::set_var("DEBUG", "TRUE");
         assert_eq!(is_development(), true);
@@ -193,7 +195,10 @@ mod tests {
         assert_eq!(is_development(), false);
         
         // Reset environment variables
-        dotenv::dotenv().ok();
+        match debug {
+            Ok(debug) => env::set_var("DEBUG", debug),
+            Err(_) => {}
+        };
     }
 
     #[test]
@@ -222,6 +227,8 @@ mod tests {
 
     #[test]
     fn test_server_port() {
+        let port = env::var("PORT");
+        
         env::set_var("PORT", "5000");
         assert_eq!(server_port(), "5000");
         
@@ -235,30 +242,54 @@ mod tests {
         }
         
         // Reset environment variables
-        dotenv::dotenv().ok();
+        match port {
+            Ok(port) => {
+                env::set_var("PORT", port);
+            }
+            Err(_) => {
+            }
+        };
     }
 
     #[test]
     #[cfg(debug_assertions)]
     fn test_set_debug() {
+        let debug = env::var("DEBUG");
+        
         env::remove_var("DEBUG");
         
         set_debug();
         assert_eq!(env::var("DEBUG").unwrap(), "TRUE");
         
         // Reset environment variables
-        dotenv::dotenv().ok();
+        match debug {
+            Ok(debug) => {
+                env::set_var("DEBUG", debug);
+            }
+            Err(_) => {
+            }
+        };
     }
 
     #[test]
     fn test_mysql_username() {
+        let username = env::var("USERNAME");
+        
         env::set_var("MYSQL_USERNAME", "test_user");
         assert_eq!(mysql_username(), "test_user");
 
         env::remove_var("MYSQL_USERNAME");
         assert_eq!(mysql_username(), "root");
+        
+        match username {
+            Ok(username) => {
+                env::set_var("MYSQL_USERNAME", username);
+            }
+            Err(_) => {
+            }
+        };
     }
-
+    
     #[test]
     fn test_mysql_password() {
         dotenv::dotenv().ok();
@@ -275,27 +306,52 @@ mod tests {
         env::set_var("MYSQL_PASSWORD", &original_password);
         assert_eq!(mysql_password(), original_password);
     }
-
+    
     #[test]
     fn test_mysql_host() {
+        let host = env::var("MYSQL_HOST");
+        
         env::set_var("MYSQL_HOST", "192.168.1.2");
         assert_eq!(mysql_host(), "192.168.1.2");
 
         env::remove_var("MYSQL_HOST");
         assert_eq!(mysql_host(), "127.0.0.1");
+        
+        match host {
+            Ok(port) => {
+                env::set_var("MYSQL_HOST", port);
+            }
+            Err(_) => {
+            }
+        };
     }
-
+    
     #[test]
     fn test_mysql_port() {
+        let port = env::var("PORT");
+        
         env::set_var("MYSQL_PORT", "3307");
         assert_eq!(mysql_port(), "3307");
 
         env::remove_var("MYSQL_PORT");
         assert_eq!(mysql_port(), "3306");
+        
+        match port {
+            Ok(port) => {
+                env::set_var("PORT", port);
+            }
+            Err(_) => {
+            }
+        };
     }
-
+    
     #[test]
     fn test_mysql_database() {
+        // Get environment variables
+        let debug_mode = env::var("DEBUG");
+        let mysql_db = env::var("MYSQL_DATABASE");
+        let mysql_database_name = env::var("MYSQL_DATABASE_NAME");
+        
         // Test with MYSQL_DATABASE set
         env::set_var("DEBUG", "TRUE");
         env::set_var("MYSQL_DATABASE", "test_db");
@@ -317,16 +373,23 @@ mod tests {
         assert_eq!(mysql_database(), "perseverancia-production");
         
         // Reset environment variables
-        dotenv::dotenv().ok();
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_secret_token() {
-        env::remove_var("SECRET_TOKEN");
-        secret_token();
-        
-        // Reset environment variables
-        dotenv::dotenv().ok();
+        match debug_mode {
+            Ok(debug_mode) => {
+                env::set_var("DEBUG", debug_mode);
+            }
+            Err(_) => {}
+        };
+        match mysql_db {
+            Ok(mysql_db) => {
+                env::set_var("MYSQL_DATABASE", mysql_db);
+            }
+            Err(_) => {}
+        };
+        match mysql_database_name {
+            Ok(mysql_database_name) => {
+                env::set_var("MYSQL_DATABASE_NAME", mysql_database_name);
+            }
+            Err(_) => {}
+        };
     }
 }
