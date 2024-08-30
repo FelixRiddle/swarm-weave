@@ -87,7 +87,16 @@ pub fn mysql_username() -> String {
 /// 
 /// 
 pub fn mysql_password() -> String {
-    env::var("MYSQL_PASSWORD").unwrap_or_else(|_| "".to_string())
+    let password = match env::var("MYSQL_PASSWORD") {
+        Ok(password) => {
+            password
+        },
+        Err(_) => {
+            String::from("")
+        }
+    };
+    
+    password
 }
 
 /// Host
@@ -182,6 +191,9 @@ mod tests {
         
         env::remove_var("DEBUG");
         assert_eq!(is_development(), false);
+        
+        // Reset environment variables
+        dotenv::dotenv().ok();
     }
 
     #[test]
@@ -221,14 +233,21 @@ mod tests {
             env::remove_var("DEBUG");
             assert_eq!(rest_server_port(), "8082");
         }
+        
+        // Reset environment variables
+        dotenv::dotenv().ok();
     }
 
     #[test]
     #[cfg(debug_assertions)]
     fn test_set_debug() {
         env::remove_var("DEBUG");
+        
         set_debug();
         assert_eq!(env::var("DEBUG").unwrap(), "TRUE");
+        
+        // Reset environment variables
+        dotenv::dotenv().ok();
     }
 
     #[test]
@@ -242,11 +261,19 @@ mod tests {
 
     #[test]
     fn test_mysql_password() {
+        dotenv::dotenv().ok();
+        let original_password = mysql_password();
+        
         env::set_var("MYSQL_PASSWORD", "test_password");
         assert_eq!(mysql_password(), "test_password");
-
+        
+        // I think rust shares environment variables between tests, thought it didn't
         env::set_var("MYSQL_PASSWORD", "");
         assert_eq!(mysql_password(), "");
+        
+        // Use dotenv to assert the password is set correctly
+        env::set_var("MYSQL_PASSWORD", &original_password);
+        assert_eq!(mysql_password(), original_password);
     }
 
     #[test]
@@ -288,6 +315,9 @@ mod tests {
         env::remove_var("MYSQL_DATABASE");
         env::remove_var("MYSQL_DATABASE_NAME");
         assert_eq!(mysql_database(), "perseverancia-production");
+        
+        // Reset environment variables
+        dotenv::dotenv().ok();
     }
 
     #[test]
@@ -295,5 +325,8 @@ mod tests {
     fn test_secret_token() {
         env::remove_var("SECRET_TOKEN");
         secret_token();
+        
+        // Reset environment variables
+        dotenv::dotenv().ok();
     }
 }

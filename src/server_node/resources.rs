@@ -2,7 +2,6 @@ use chrono::{
     DateTime,
     Utc
 };
-use futures::StreamExt;
 use std::error::Error;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, DatabaseConnection,
@@ -94,7 +93,7 @@ impl Resources {
         // Storage
         let disks = Disks::new_with_refreshed_list();
         let mut storages = Vec::new();
-
+        
         for disk in disks.list() {
             let storage = Storage::new(disk)?;
             
@@ -113,25 +112,20 @@ impl Resources {
         self.cpus.len() as u32
     }
     
-    // pub fn total_storage_usage_percentage(&self) -> i64 {
-    //     self.storage.iter().map(|storage| storage.usage_percentage()).sum::<i64>() / self.storage.len()
-    // }
-    
     /// Insert data
     /// 
     /// 
-    pub async fn insert_data(db: &DatabaseConnection) -> Result<(), Box<dyn Error>> {
-        let resources = Resources::fetch_resources()?;
+    pub async fn insert_data(&self, db: &DatabaseConnection) -> Result<(), Box<dyn Error>> {
         
         // Create and insert resources
         let system_resources_instance = system_resources::ActiveModel {
-            eval_time: ActiveValue::Set(resources.eval_time.naive_utc()),
+            eval_time: ActiveValue::Set(self.eval_time.naive_utc()),
            ..Default::default() // all other attributes are `NotSet`
         };
         let system_resources_id = system_resources_instance.insert(db).await?.id;
         
         // Create system core instances
-        let system_core_instances: Result<Vec<system_core::ActiveModel>, Box<dyn Error>> = resources.cpus.iter().map(|cpu| {
+        let system_core_instances: Result<Vec<system_core::ActiveModel>, Box<dyn Error>> = self.cpus.iter().map(|cpu| {
             create_system_core_instance(cpu, system_resources_id)
         }).collect();
         let system_core_instances = system_core_instances?;
@@ -141,15 +135,15 @@ impl Resources {
         
         // System memory instance
         let system_memory_instance = system_memory::ActiveModel {
-            total: ActiveValue::Set(i64::try_from(resources.memory.total)?),
-            used: ActiveValue::Set(i64::try_from(resources.memory.used)?),
+            total: ActiveValue::Set(i64::try_from(self.memory.total)?),
+            used: ActiveValue::Set(i64::try_from(self.memory.used)?),
             system_resource_id: ActiveValue::Set(Some(system_resources_id)),
            ..Default::default()
         };
         system_memory_instance.insert(db).await?;
         
         // Insert storage data
-        for storage in &resources.storage {
+        for storage in &self.storage {
             let storage_instance = storage_device::ActiveModel {
                 name: ActiveValue::Set(storage.name.clone()),
                 total: ActiveValue::Set(i64::try_from(storage.total)?),
@@ -168,6 +162,10 @@ impl Resources {
 mod tests {
     use super::*;
     
+    use crate::database::mysql_connection;
+    
+    use sea_orm::EntityTrait;
+    
     #[test]
     fn test_fetch_resources() {
         let resources = Resources::fetch_resources().unwrap();
@@ -175,10 +173,54 @@ mod tests {
         assert!(resources.memory.total > 0);
         assert!(!resources.storage.is_empty()); // Check if storage vector is not empty
     }
-
+    
     #[test]
     fn test_total_cores() {
         let resources = Resources::fetch_resources().unwrap();
         assert!(resources.total_cores() > 0);
+    }
+    
+    #[tokio::test]
+    async fn test_insert_data() {
+        // Set environment variables
+        dotenv::dotenv().ok();
+        
+        // Initialize database connection
+        let db = mysql_connection().await.unwrap();
+        
+        // Fetch resources
+        let resources = Resources::fetch_resources().unwrap();
+        
+        // Call the insert_data function
+        resources.insert_data(&db).await.unwrap();
+        
+        // Verify that data was inserted correctly
+        let system_resources = system_resources::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        
+        assert!(!system_resources.is_empty());
+        
+        let system_cores = system_core::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        
+        assert!(!system_cores.is_empty());
+        
+        let system_memory = system_memory::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        
+        assert!(!system_memory.is_empty());
+        
+        let storage_devices = storage_device::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        
+        assert!(!storage_devices.is_empty());
     }
 }
