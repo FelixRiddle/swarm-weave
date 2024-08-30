@@ -97,7 +97,14 @@ impl Resources {
         for disk in disks.list() {
             let storage = Storage::new(disk)?;
             
-            storages.push(storage);
+            // I've noticed that in the database a disk with the same name may be inserted twice
+            // However this shouldn't be possible, because the name acts like an id and if they are the same, then
+            // it's the same disk, so we need to check the id to not insert it twice.
+            
+            // Check if a disk with the same ID already exists in the storages vector
+            if !storages.iter().any(|existing_storage: &Storage| existing_storage.name == storage.name) {
+                storages.push(storage);
+            }
         }
         
         Ok(Resources {
