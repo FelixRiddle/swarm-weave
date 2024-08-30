@@ -17,7 +17,6 @@ pub fn mysql_connection_string() -> String {
 /// 
 pub async fn mysql_connection() -> Result<DatabaseConnection, Box<dyn Error>> {
     let connection_url = &mysql_connection_string();
-    println!("Connection url: {connection_url}");
     Ok(Database::connect(connection_url).await?)
 }
 

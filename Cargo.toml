@@ -8,11 +8,7 @@ keywords = ["backend", "general", "api", "rust"]
 categories = ["web-programming", "database"]
 
 [workspace]
-members = [
-    ".",
-    "entity",
-    "migration"
-]
+members = [".", "entity", "migration"]
 
 [dependencies]
 actix-session = "0.10.0"
@@ -46,10 +42,7 @@ vfs = "0.12.0"
 
 [dependencies.clap]
 version = "4.5.3"
-features = [
-    "derive",
-    "color"
-]
+features = ["derive", "color"]
 
 [dependencies.entity]
 path = "entity"
@@ -70,7 +63,7 @@ features = [
     "relay",
     "tcp",
     "tokio",
-    "yamux"
+    "yamux",
 ]
 
 [dependencies.migration]
@@ -78,13 +71,17 @@ path = "migration"
 
 [dependencies.sea-orm]
 version = "1.0.0"
-features = ["sqlx-mysql", "runtime-tokio-native-tls", "with-chrono", "with-json", "macros"]
+features = [
+    "sqlx-mysql",
+    "runtime-tokio-native-tls",
+    "with-chrono",
+    "with-json",
+    "macros",
+]
 
 [dependencies.sysinfo]
 version = "0.31.2"
-features = [
-    "serde"
-]
+features = ["serde"]
 
 [dependencies.tokio]
 version = "1.39.2"
