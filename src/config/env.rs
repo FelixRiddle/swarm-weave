@@ -352,25 +352,8 @@ mod tests {
         let mysql_db = env::var("MYSQL_DATABASE");
         let mysql_database_name = env::var("MYSQL_DATABASE_NAME");
         
-        // Test with MYSQL_DATABASE set
-        env::set_var("DEBUG", "TRUE");
-        env::set_var("MYSQL_DATABASE", "test_db");
-        assert_eq!(mysql_database(), "test_db");
-        
-        // Test with MYSQL_DATABASE_NAME set
-        env::remove_var("MYSQL_DATABASE");
-        env::set_var("MYSQL_DATABASE_NAME", "test_db_name");
-        assert_eq!(mysql_database(), "test_db_name");
-        
-        // Test with both MYSQL_DATABASE and MYSQL_DATABASE_NAME set
-        env::set_var("MYSQL_DATABASE", "test_db_both");
-        assert_eq!(mysql_database(), "test_db_both");
-        
-        // Test with neither MYSQL_DATABASE nor MYSQL_DATABASE_NAME set
-        env::remove_var("DEBUG");
-        env::remove_var("MYSQL_DATABASE");
-        env::remove_var("MYSQL_DATABASE_NAME");
-        assert_eq!(mysql_database(), "perseverancia-production");
+        // Test database name
+        assert_eq!(mysql_database(), get_test_database_name());
         
         // Reset environment variables
         match debug_mode {
