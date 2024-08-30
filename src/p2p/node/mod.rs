@@ -343,33 +343,34 @@ mod tests {
         test_node.save_config().unwrap();
     }
     
-    #[tokio::test]
-    async fn test_new_node_with_test_handler() {
-        let parameters = HiveParameters {
-            server: true,
-            key_seed: Some(120),
-            relay: true,
-            use_ipv6: Some(false),
-            port: Some(45830),
-            server_address: None,
-            server_peer_id: None,
-        };
+    // Not gonna use 'Node' for a while
+    // #[tokio::test]
+    // async fn test_new_node_with_test_handler() {
+    //     let parameters = HiveParameters {
+    //         server: true,
+    //         key_seed: Some(120),
+    //         relay: true,
+    //         use_ipv6: Some(false),
+    //         port: Some(45830),
+    //         server_address: None,
+    //         server_peer_id: None,
+    //     };
         
-        let suite = HiveFolderTestSuite::default();
-        let test_handler = suite.create_server_node("127.0.0.1".to_string(), 45830).unwrap();
+    //     let suite = HiveFolderTestSuite::default();
+    //     let test_handler = suite.create_server_node("127.0.0.1".to_string(), 45830).unwrap();
         
-        let result = Node::new_with_test_handler(parameters, test_handler).await;
-        assert!(result.is_ok());
+    //     let result = Node::new_with_test_handler(parameters, test_handler).await;
+    //     assert!(result.is_ok());
         
-        let node = result.unwrap();
-        assert_eq!(node.parameters.key_seed, Some(120));
-        assert_eq!(node.parameters.relay, true);
-        assert_eq!(node.parameters.use_ipv6, Some(false));
-        assert_eq!(node.parameters.port, Some(45830));
-        assert!(node.test_handler.is_some());
+    //     let node = result.unwrap();
+    //     assert_eq!(node.parameters.key_seed, Some(120));
+    //     assert_eq!(node.parameters.relay, true);
+    //     assert_eq!(node.parameters.use_ipv6, Some(false));
+    //     assert_eq!(node.parameters.port, Some(45830));
+    //     assert!(node.test_handler.is_some());
         
-        node.test_handler.unwrap().save_config().unwrap();
-    }
+    //     node.test_handler.unwrap().save_config().unwrap();
+    // }
     
     // TODO: Test that the chat works, by starting two nodes and sending a private key or something
     

@@ -149,6 +149,8 @@ impl Resources {
                 total: ActiveValue::Set(i64::try_from(storage.total)?),
                 used: ActiveValue::Set(i64::try_from(storage.used)?),
                 system_resource_id: ActiveValue::Set(Some(system_resources_id)),
+                is_removable: ActiveValue::Set(storage.is_removable as i8),
+                kind: ActiveValue::Set(serde_json::to_string(&storage.kind)?),
                ..Default::default()
             };
             storage_instance.save(db).await?;

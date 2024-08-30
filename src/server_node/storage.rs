@@ -3,7 +3,10 @@ use sysinfo::{
     Disk, DiskKind as SysDiskKind,
 };
 
-#[derive(Serialize, Deserialize)]
+/// Disk kind
+/// 
+/// Sysinfo already has DiskKind however it's not serializable / deserializable
+#[derive(Clone, Deserialize, Serialize)]
 pub enum DiskKind {
     HDD,
     SSD,
