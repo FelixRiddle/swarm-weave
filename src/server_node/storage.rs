@@ -40,8 +40,8 @@ impl Storage {
         })
     }
     
-    pub fn usage_percentage(&self) -> u64 {
-        (self.used / self.total) * 100
+    pub fn usage_percentage(&self) -> f32 {
+        (self.used as f32 / self.total as f32) * 100.0
     }
     
     pub fn available_space(&self) -> u64 {
@@ -62,7 +62,7 @@ mod tests {
             name: "sda1".to_string(),
             is_removable: true,
         };
-        assert_eq!(storage.usage_percentage(), 50);
+        assert_eq!(storage.usage_percentage(), 50.0);
     }
     
     #[test]
