@@ -188,7 +188,7 @@ pub mod tests {
 		system_core::Entity as SystemCoreEntity,
 		system_resources::Entity as SystemResourcesEntity
 	};
-	use sea_orm::{EntityTrait, IntoActiveModel, ModelTrait};
+	use sea_orm::{EntityTrait, ModelTrait};
 	
     use crate::database::mysql_connection;
 	use crate::server_node::resources::to_f32;
@@ -203,7 +203,6 @@ pub mod tests {
 		}
 	};
 	use super::CpuCore;
-	use super::CpuCoreController;
 
 	#[tokio::test]
 	async fn test_update_system_cores() {
@@ -217,22 +216,7 @@ pub mod tests {
         let resources = Resources::fetch_resources().unwrap();
 		
         // Insert initial data
-        let resource_id = resources.insert_data(&db).await.unwrap();
-		
-        // Verify that the data was inserted correctly
-		let system_resources_entity = SystemResourcesEntity::find_by_id(resource_id)
-			.one(&db)
-			.await
-			.unwrap()
-			.unwrap();
-		let cpu_core_ctrl = CpuCoreController::new(
-			db.clone(),
-            resources,
-            system_resources_entity.clone().into_active_model()
-        );
-		
-        // Get the ID of the inserted system resources
-        let id: i64 = system_resources_entity.id;
+        let resource_id: i64 = resources.insert_data(&db).await.unwrap();
 		
         // Update resources
         let updated_resources = Resources {
@@ -255,7 +239,7 @@ pub mod tests {
         };
 		
         // Call the update function
-        updated_resources.update(id, &db).await.unwrap();
+        updated_resources.update(resource_id, &db).await.unwrap();
 		
         // Verify that the data was updated correctly
 		let res_model = SystemResourcesEntity::find_by_id(resource_id)
