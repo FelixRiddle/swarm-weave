@@ -21,7 +21,10 @@ use sysinfo::{Disks, System};
 pub mod system_core;
 
 use super::storage::Storage;
-use system_core::SystemCore as Cpu;
+use system_core::{
+	SystemCore as Cpu,
+	SystemCoreController,
+};
 
 /// Convert f64 to f32
 ///
@@ -38,13 +41,13 @@ pub fn to_f32(x: f64) -> Result<f32, Box<dyn Error>> {
 /// Ram memory
 ///
 ///
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Memory {
     pub total: u64,
     pub used: u64,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Resources {
     // pub id: Option<i64>,
     pub cpus: Vec<Cpu>,
@@ -115,10 +118,18 @@ impl Resources {
             eval_time: ActiveValue::Set(self.eval_time.naive_utc()),
             ..Default::default() // all other attributes are `NotSet`
         };
-        let system_resources_id = system_resources_instance.insert(db).await?.id;
+        let system_resources_id = system_resources_instance
+			.clone()
+			.insert(db)
+			.await?.id;
 		
         // Create system core instances
-        let system_core_instances = Cpu::create_cores(self, system_resources_id)?;
+		let system_core_controller = SystemCoreController::new(
+			db.clone(),
+			self.clone(),
+			system_resources_instance.clone(),
+		);
+        let system_core_instances = system_core_controller.create_cores()?;
         for system_core_instance in system_core_instances {
             system_core_instance.save(db).await?;
         }
@@ -169,12 +180,12 @@ impl Resources {
         };
 		
         // Update system cores
-		Cpu::update_cores(
-			self,
-			system_resources_id,
-			db,
-			system_resources_instance.clone()
-		).await?;
+		let system_core_controller = SystemCoreController::new(
+			db.clone(),
+			self.clone(),
+			system_resources_instance.clone(),
+		);
+		system_core_controller.update_all_cores().await?;
 		
         // System memory instance
         let system_memory_instance = system_memory::ActiveModel {

@@ -3,9 +3,8 @@ use entity::{
 		Entity as SystemCoreEntity,
         ActiveModel as SystemCoreActiveModel
 	},
-    system_resources::ActiveModel as SystemResources,
+    system_resources::ActiveModel as SystemResourcesActiveModel,
 };
-// use futures::{executor::ThreadPool, join};
 use sea_orm::{
 	ModelTrait,
     ActiveValue,
@@ -22,23 +21,62 @@ use super::{
 /// TODO: Rename to CpuCore or Core
 /// 
 /// 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct SystemCore {
     pub usage_percentage: f64,
     pub free_percentage: f64,
 }
 
+/// System core controller
+/// 
+/// Because I'm tired of using references
+pub struct SystemCoreController {
+	pub db: DatabaseConnection,
+	pub system_resources: Resources,
+	pub system_resources_instance: SystemResourcesActiveModel,
+}
+
 /// Database and Resources
 /// 
 /// 
-impl SystemCore {
+impl SystemCoreController {
+	/// Create new
+	/// 
+	/// 
+	pub fn new(
+		db: DatabaseConnection,
+        system_resources: Resources,
+        system_resources_instance: SystemResourcesActiveModel,
+	) -> Self {
+		Self {
+			db,
+			system_resources,
+			system_resources_instance,
+		}
+	}
+	
+	/// Get id or throw error
+	/// 
+	/// 
+	pub fn id(&self) -> Result<i64, Box<dyn Error>> {
+		let mut system_resources_id = self.system_resources_instance.id.clone();
+		let system_resources_id = match system_resources_id.take() {
+            Some(id) => id,
+            None => return Err(format!("Failed to create system core instance with system resources id").into()),
+        };
+		
+		Ok(system_resources_id)
+	}
+	
 	/// Create system core instance
 	/// 
 	/// 
 	pub fn create_system_core_instance(
+		&self,
 		cpu: &SystemCore,
-		system_resources_id: i64,
 	) -> Result<SystemCoreActiveModel, Box<dyn Error>> {
+		let system_resources_id = self.id()?;
+		
 		// Create system core
 		let system_core_instance = SystemCoreActiveModel {
 			usage_percentage: ActiveValue::Set(to_f32(cpu.usage_percentage)?),
@@ -46,18 +84,18 @@ impl SystemCore {
 			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
 			..Default::default() // all other attributes are `NotSet`
 		};
-
+		
 		Ok(system_core_instance)
 	}
 	
 	/// Create cores from resources
 	/// 
 	/// 
-	pub fn create_cores(res: &Resources, system_resources_id: i64) -> Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> {
-		let system_core_instances: Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> = res
+	pub fn create_cores(&self) -> Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> {
+		let system_core_instances: Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> = self.system_resources
             .cpus
             .iter()
-            .map(|cpu| SystemCore::create_system_core_instance(cpu, system_resources_id))
+            .map(|cpu| self.create_system_core_instance(cpu))
             .collect();
 		
 		system_core_instances
@@ -66,22 +104,19 @@ impl SystemCore {
 	/// Update cores from resources
 	/// 
 	/// 
-	pub async fn update_cores(
-		res: &Resources,
-		system_resources_id: i64,
-		db: &DatabaseConnection,
-		system_resources_instance: SystemResources
+	pub async fn update_all_cores(
+		&self,
 	) -> Result<(), Box<dyn Error>> {
         // Update system cores
-        let system_core_instances = SystemCore::create_cores(res, system_resources_id)?;
+        let system_core_instances = self.create_cores()?;
 		
 		// Cpus don't have identification
 		// Find related cpus
-		let cpus = system_resources_instance
+		let cpus = self.system_resources_instance
 			.clone()
 			.try_into_model()?
 			.find_related(SystemCoreEntity)
-			.all(db)
+			.all(&self.db)
 			.await?;
 		
 		// Remove difference
@@ -89,10 +124,20 @@ impl SystemCore {
 		println!("Current instances: {}", system_core_instances.len());
 		println!("Existing instances: {}", cpus.len());
 		println!("Absolute difference: {}", diff);
+		
 		// It's done like this because cores cannot be identified
 		if diff > 0 {
 			// TODO: We have to remove some, and update those that remain
-			
+			// Remove extras
+			let mut current: usize = 0;
+			while current < usize::try_from(diff)? {
+				cpus[current]
+					.clone()
+					.delete(&self.db)
+					.await?;
+				
+				current += 1;
+			}
 		} else {
 			// It's negative so there are less in the database
 			// let diff = diff * -1;
@@ -107,60 +152,4 @@ impl SystemCore {
 		
 		Ok(())
 	}
-	
-	// /// Update cores v2
-	// /// 
-	// /// Generated with tabnine
-	// pub fn update_cores_v2(
-	// 	&self,
-	// 	updated_resources: &Resources,
-	// 	system_resources_id: i64,
-	// 	db: &DatabaseConnection,
-	// ) -> Result<(), anyhow::Error> {
-	// 	// Get existing system cores
-	// 	let existing_system_cores = SystemCore::find_by_system_resources_id(system_resources_id)
-	// 		.all(db)
-	// 		.await?
-	// 		.unwrap();
-	
-	// 	// Create a map of existing cores for faster lookup
-	// 	let existing_cores_map: HashMap<String, entity::system_core::Model> = existing_system_cores
-	// 		.iter()
-	// 		.map(|core| (core.name.clone(), core.clone()))
-	// 		.collect();
-	
-	// 	// Iterate over the updated cores and update or insert them
-	// 	for updated_core in &updated_resources.cpus {
-	// 		if let Some(existing_core) = existing_cores_map.get(&updated_core.name) {
-	// 			// Update existing core
-	// 			existing_core.update(|m| {
-	// 				m.usage_percentage = to_f32(updated_core.usage_percentage)?;
-	// 				m.free_percentage = to_f32(updated_core.free_percentage)?;
-	// 				Ok(())
-	// 			})
-	// 			.exec(db)
-	// 			.await?;
-	// 		} else {
-	// 			// Insert new core
-	// 			let new_core = entity::system_core::Model::new(updated_core.name.clone())
-	// 				.set_system_resources_id(system_resources_id)
-	// 				.set_usage_percentage(to_f32(updated_core.usage_percentage)?)
-	// 				.set_free_percentage(to_f32(updated_core.free_percentage)?);
-	
-	// 			new_core.insert(db).await?;
-	// 		}
-	// 	}
-	
-	// 	// Delete any remaining cores that are not in the updated resources
-	// 	let remaining_cores: Vec<entity::system_core::Model> = existing_system_cores
-	// 		.into_iter()
-	// 		.filter(|core| !updated_resources.cpus.iter().any(|updated_core| updated_core.name == core.name))
-	// 		.collect();
-	
-	// 	for remaining_core in remaining_cores {
-	// 		remaining_core.delete(db).await?;
-	// 	}
-	
-	// 	Ok(())
-	// }
 }

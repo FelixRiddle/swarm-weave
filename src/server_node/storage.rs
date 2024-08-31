@@ -13,7 +13,7 @@ pub enum DiskKind {
     Unknown,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Storage {
     // In bytes
     pub total: u64,
