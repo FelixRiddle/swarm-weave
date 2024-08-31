@@ -1,21 +1,25 @@
-use super::storage::Storage;
 use chrono::{DateTime, Utc};
 use entity::{
-    storage_device,
+    storage_device::{
+		Entity as StorageDeviceEntity,
+		ActiveModel as StorageDevice
+	},
     system_core,
     system_memory,
-    // sea_orm_active_enums::Status,
-    system_resources,
+    system_resources::ActiveModel as SystemResources,
 };
+// use futures::{executor::ThreadPool, join};
 use sea_orm::{
+	ModelTrait,
     ActiveModelTrait,
     ActiveValue,
-    DatabaseConnection,
-    // DbBackend, DbErr, QueryFilter
+    DatabaseConnection, TryIntoModel,
 };
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use sysinfo::{Disks, System};
+
+use super::storage::Storage;
 
 /// Convert f64 to f32
 ///
@@ -129,12 +133,12 @@ impl Resources {
     /// Returns system resources id
     pub async fn insert_data(&self, db: &DatabaseConnection) -> Result<i64, Box<dyn Error>> {
         // Create and insert resources
-        let system_resources_instance = system_resources::ActiveModel {
+        let system_resources_instance = SystemResources {
             eval_time: ActiveValue::Set(self.eval_time.naive_utc()),
             ..Default::default() // all other attributes are `NotSet`
         };
         let system_resources_id = system_resources_instance.insert(db).await?.id;
-
+		
         // Create system core instances
         let system_core_instances: Result<Vec<system_core::ActiveModel>, Box<dyn Error>> = self
             .cpus
@@ -145,7 +149,7 @@ impl Resources {
         for system_core_instance in system_core_instances {
             system_core_instance.save(db).await?;
         }
-
+		
         // System memory instance
         let system_memory_instance = system_memory::ActiveModel {
             total: ActiveValue::Set(i64::try_from(self.memory.total)?),
@@ -154,10 +158,10 @@ impl Resources {
             ..Default::default()
         };
         system_memory_instance.save(db).await?;
-
+		
         // Insert storage data
         for storage in &self.storage {
-            let storage_instance = storage_device::ActiveModel {
+            let storage_instance = StorageDevice {
                 name: ActiveValue::Set(storage.name.clone()),
                 total: ActiveValue::Set(i64::try_from(storage.total)?),
                 used: ActiveValue::Set(i64::try_from(storage.used)?),
@@ -168,7 +172,7 @@ impl Resources {
             };
             storage_instance.save(db).await?;
         }
-
+		
         Ok(system_resources_id)
     }
 
@@ -181,11 +185,11 @@ impl Resources {
         db: &DatabaseConnection,
     ) -> Result<(), Box<dyn Error>> {
         // Create and insert resources
-        let system_resources_instance = system_resources::ActiveModel {
+        let system_resources_instance = SystemResources {
             eval_time: ActiveValue::Set(self.eval_time.naive_utc()),
             id: ActiveValue::Unchanged(system_resources_id),
         };
-        let mut system_resources_id = system_resources_instance.save(db).await?.id;
+        let mut system_resources_id = system_resources_instance.clone().save(db).await?.id;
         let system_resources_id = match system_resources_id.take() {
             Some(id) => id,
             None => return Err(format!("Failed to update system resources with id").into()),
@@ -210,10 +214,54 @@ impl Resources {
             ..Default::default()
         };
         system_memory_instance.save(db).await?;
-
+		
+		// We need to know how many storage devices do we have already
+		// We know storage devices name is unique
+		let system_resources_instance = system_resources_instance
+			.try_into_model()?;
+		let existing_storage_devices = system_resources_instance
+			.find_related(StorageDeviceEntity)
+			.all(db)
+			.await?;
+		
+		// Compare with our storage devices and remove from the database those that aren't in this structure
+		let removed_devices: Vec<&entity::storage_device::Model> = existing_storage_devices
+			.iter()
+			// Get missing storage devices to remove
+			.filter(|storage_device| {
+				let is_there = existing_storage_devices
+					.iter()
+					.filter(|existing_device| existing_device.id == storage_device.id)
+					.collect::<Vec<_>>();
+				
+				if !is_there.is_empty() {
+					return true;
+				}
+				
+				false
+			})
+			.collect::<Vec<_>>();
+		
+		// Delete removed devices in parallel
+		let mut handles: Vec<tokio::task::JoinHandle<Result<(), anyhow::Error>>> = vec![];
+		for model in removed_devices {
+			let model: entity::storage_device::Model = model.clone();
+			let db = db.clone();
+			
+			handles.push(tokio::spawn(async move {
+				model.delete(&db).await.map_err(|e| anyhow::Error::new(e))?;
+				Ok(())
+			}));
+		}
+		
+		// Wait for deletions to complete
+		for handle in handles {
+            handle.await??;
+        }
+		
         // Insert storage data
         for storage in &self.storage {
-            let storage_instance = storage_device::ActiveModel {
+            let storage_instance = StorageDevice {
                 name: ActiveValue::Set(storage.name.clone()),
                 total: ActiveValue::Set(i64::try_from(storage.total)?),
                 used: ActiveValue::Set(i64::try_from(storage.used)?),
@@ -224,7 +272,7 @@ impl Resources {
             };
             storage_instance.save(db).await?;
         }
-
+		
         Ok(())
     }
 }
@@ -270,7 +318,7 @@ mod tests {
         resources.insert_data(&db).await.unwrap();
 
         // Verify that data was inserted correctly
-        let system_resources = system_resources::Entity::find().all(&db).await.unwrap();
+        let system_resources = SystemResources::find().all(&db).await.unwrap();
 
         assert!(!system_resources.is_empty());
 
@@ -282,7 +330,7 @@ mod tests {
 
         assert!(!system_memory.is_empty());
 
-        let storage_devices = storage_device::Entity::find().all(&db).await.unwrap();
+        let storage_devices = StorageDevice::find().all(&db).await.unwrap();
 
         assert!(!storage_devices.is_empty());
     }
@@ -320,7 +368,7 @@ mod tests {
             }],
             eval_time: Utc::now(),
         };
-
+		
         // Get the ID of the inserted system resources
         let res_model = SystemResources::find_by_id(resource_id)
             .one(&db)
@@ -443,7 +491,7 @@ mod tests {
 
         // Fetch resources
         let resources = Resources::fetch_resources().unwrap();
-
+		
         // Insert initial data
         let resource_id = resources.insert_data(&db).await.unwrap();
 
@@ -524,16 +572,16 @@ mod tests {
     async fn test_update() {
         // Set environment variables
         dotenv::dotenv().ok();
-
+		
         // Initialize database connection
         let db = mysql_connection().await.unwrap();
-
+		
         // Fetch resources
         let resources = Resources::fetch_resources().unwrap();
-
+		
         // Insert initial data
         let resource_id = resources.insert_data(&db).await.unwrap();
-
+		
         // Update resources
         let updated_resources = Resources {
             cpus: vec![Cpu {
@@ -553,7 +601,7 @@ mod tests {
             }],
             eval_time: Utc::now(),
         };
-
+		
         // Get the ID of the inserted system resources
         let res_model = SystemResources::find_by_id(resource_id)
             .one(&db)
@@ -564,14 +612,14 @@ mod tests {
 
         // Call the update function
         updated_resources.update(id, &db).await.unwrap();
-
+		
         // Verify that the data was updated correctly
         let res_model = SystemResources::find_by_id(resource_id)
             .one(&db)
             .await
             .unwrap()
             .unwrap();
-
+		
 		// This test fails for a negligible difference
         // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
 		
@@ -580,7 +628,7 @@ mod tests {
 			.all(&db)
 			.await
 			.unwrap();
-
+		
         assert_eq!(updated_system_cores.len(), 1);
         assert_eq!(
             updated_system_cores[0].usage_percentage,
