@@ -111,7 +111,7 @@ impl CpuCoreController {
 		
 		// Cpus don't have identification
 		// Find related cpus
-		let cpus: Vec<SystemCoreModel> = self.system_resources_instance
+		let mut cpus: Vec<SystemCoreModel> = self.system_resources_instance
 			.clone()
 			.try_into_model()?
 			.find_related(SystemCoreEntity)
@@ -163,6 +163,17 @@ impl CpuCoreController {
 			}
 		} else if diff == 0 {
 			println!("Cores quantity hasn't changed");
+			for(index, cpu_core) in cpus.iter_mut().enumerate() {
+				let local_core = &self.system_resources.cpus[index];
+				cpu_core.usage_percentage = local_core.usage_percentage as f32;
+				cpu_core.free_percentage = local_core.free_percentage as f32;
+				
+				cpu_core
+					.clone()
+					.into_active_model()
+					.update(&self.db)
+					.await?;
+			}
 		} else {
 			println!("There are more cores locally than in the database");
 			
