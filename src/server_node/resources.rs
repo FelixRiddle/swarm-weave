@@ -4,7 +4,10 @@ use entity::{
 		Entity as StorageDeviceEntity,
 		ActiveModel as StorageDevice
 	},
-    system_core,
+    system_core::{
+		Entity as SystemCoreEntity,
+        ActiveModel as SystemCore
+	},
     system_memory,
     system_resources::ActiveModel as SystemResources,
 };
@@ -33,28 +36,93 @@ pub fn to_f32(x: f64) -> Result<f32, Box<dyn Error>> {
     }
 }
 
+/// TODO: Rename to CpuCore or Core
+/// 
+/// 
 #[derive(Deserialize, Serialize)]
 pub struct Cpu {
     pub usage_percentage: f64,
     pub free_percentage: f64,
 }
 
-/// Create system core instance
-///
-///
-fn create_system_core_instance(
-    cpu: &Cpu,
-    system_resources_id: i64,
-) -> Result<system_core::ActiveModel, Box<dyn Error>> {
-    // Create system core
-    let system_core_instance = system_core::ActiveModel {
-        usage_percentage: ActiveValue::Set(to_f32(cpu.usage_percentage)?),
-        free_percentage: ActiveValue::Set(to_f32(cpu.free_percentage)?),
-        system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-        ..Default::default() // all other attributes are `NotSet`
-    };
+/// Database and Resources
+/// 
+/// 
+impl Cpu {
+	/// Create system core instance
+	/// 
+	/// 
+	pub fn create_system_core_instance(
+		cpu: &Cpu,
+		system_resources_id: i64,
+	) -> Result<SystemCore, Box<dyn Error>> {
+		// Create system core
+		let system_core_instance = SystemCore {
+			usage_percentage: ActiveValue::Set(to_f32(cpu.usage_percentage)?),
+			free_percentage: ActiveValue::Set(to_f32(cpu.free_percentage)?),
+			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
+			..Default::default() // all other attributes are `NotSet`
+		};
 
-    Ok(system_core_instance)
+		Ok(system_core_instance)
+	}
+	
+	/// Create cores from resources
+	/// 
+	/// 
+	pub fn create_cores(res: &Resources, system_resources_id: i64) -> Result<Vec<SystemCore>, Box<dyn Error>> {
+		let system_core_instances: Result<Vec<SystemCore>, Box<dyn Error>> = res
+            .cpus
+            .iter()
+            .map(|cpu| Cpu::create_system_core_instance(cpu, system_resources_id))
+            .collect();
+		
+		system_core_instances
+	}
+	
+	/// Update cores from resources
+	/// 
+	/// 
+	pub async fn update_cores(
+		res: &Resources,
+		system_resources_id: i64,
+		db: &DatabaseConnection,
+		system_resources_instance: SystemResources
+	) -> Result<(), Box<dyn Error>> {
+        // Update system cores
+        let system_core_instances = Cpu::create_cores(res, system_resources_id)?;
+		
+		// Cpus don't have identification
+		// Find related cpus
+		let cpus = system_resources_instance
+			.clone()
+			.try_into_model()?
+			.find_related(SystemCoreEntity)
+			.all(db)
+			.await?;
+		
+		// Remove difference
+		let diff = i32::try_from(cpus.len())? - i32::try_from(system_core_instances.len())?;
+		println!("Current instances: {}", system_core_instances.len());
+		println!("Existing instances: {}", cpus.len());
+		println!("Absolute difference: {}", diff);
+		// It's done like this because cores cannot be identified
+		if diff > 0 {
+			// We have to remove some, and update those that are new
+		} else {
+			// It's negative so there are less in the database
+			// let diff = diff * -1;
+			
+			// Still updating this is a pain
+			
+			// This is just a reference
+			// for system_core_instance in system_core_instances {
+			// 	system_core_instance.save(db).await?;
+			// }
+		}
+		
+		Ok(())
+	}
 }
 
 /// Ram memory
@@ -140,12 +208,7 @@ impl Resources {
         let system_resources_id = system_resources_instance.insert(db).await?.id;
 		
         // Create system core instances
-        let system_core_instances: Result<Vec<system_core::ActiveModel>, Box<dyn Error>> = self
-            .cpus
-            .iter()
-            .map(|cpu| create_system_core_instance(cpu, system_resources_id))
-            .collect();
-        let system_core_instances = system_core_instances?;
+        let system_core_instances = Cpu::create_cores(self, system_resources_id)?;
         for system_core_instance in system_core_instances {
             system_core_instance.save(db).await?;
         }
@@ -194,18 +257,15 @@ impl Resources {
             Some(id) => id,
             None => return Err(format!("Failed to update system resources with id").into()),
         };
-
-        // Create system core instances
-        let system_core_instances: Result<Vec<system_core::ActiveModel>, Box<dyn Error>> = self
-            .cpus
-            .iter()
-            .map(|cpu| create_system_core_instance(cpu, system_resources_id))
-            .collect();
-        let system_core_instances = system_core_instances?;
-        for system_core_instance in system_core_instances {
-            system_core_instance.save(db).await?;
-        }
-
+		
+        // Update system cores
+		Cpu::update_cores(
+			self,
+			system_resources_id,
+			db,
+			system_resources_instance.clone()
+		).await?;
+		
         // System memory instance
         let system_memory_instance = system_memory::ActiveModel {
             total: ActiveValue::Set(i64::try_from(self.memory.total)?),
@@ -215,6 +275,7 @@ impl Resources {
         };
         system_memory_instance.save(db).await?;
 		
+		// Update storage
 		// We need to know how many storage devices do we have already
 		// We know storage devices name is unique
 		let system_resources_instance = system_resources_instance
@@ -302,7 +363,7 @@ mod tests {
         let resources = Resources::fetch_resources().unwrap();
         assert!(resources.total_cores() > 0);
     }
-
+	
     #[tokio::test]
     async fn test_insert_data() {
         // Set environment variables
@@ -322,7 +383,7 @@ mod tests {
 
         assert!(!system_resources.is_empty());
 
-        let system_cores = system_core::Entity::find().all(&db).await.unwrap();
+        let system_cores = SystemCore::find().all(&db).await.unwrap();
 
         assert!(!system_cores.is_empty());
 
@@ -376,10 +437,10 @@ mod tests {
             .unwrap()
             .unwrap();
         let id: i64 = res_model.id;
-
+		
         // Call the update function
         updated_resources.update(id, &db).await.unwrap();
-
+		
         // Verify that the data was updated correctly
         let res_model = SystemResources::find_by_id(resource_id)
             .one(&db)
@@ -411,16 +472,16 @@ mod tests {
 	async fn test_update_system_memory() {
 		// Set environment variables
         dotenv::dotenv().ok();
-
+		
         // Initialize database connection
         let db = mysql_connection().await.unwrap();
-
+		
         // Fetch resources
         let resources = Resources::fetch_resources().unwrap();
-
+		
         // Insert initial data
         let resource_id = resources.insert_data(&db).await.unwrap();
-
+		
         // Update resources
         let updated_resources = Resources {
             cpus: vec![Cpu {
