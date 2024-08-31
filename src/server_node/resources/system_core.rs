@@ -106,9 +106,6 @@ impl CpuCoreController {
 	pub async fn update_all_cores(
 		&self,
 	) -> Result<(), Box<dyn Error>> {
-        // // Update system cores
-        // let local_cores = self.create_cores()?;
-		
 		// Cpus don't have identification
 		// Find related cpus
 		let mut cpus: Vec<SystemCoreModel> = self.system_resources_instance
@@ -177,15 +174,45 @@ impl CpuCoreController {
 		} else {
 			println!("There are more cores locally than in the database");
 			
-			// It's negative so there are less in the database
-			// let diff = diff * -1;
+			// Update the first cores
+			let mut current: usize = 0;
+			while current < usize::try_from(diff)? {
+				let mut model = cpus[current].clone();
+				
+				let local_core = &self.system_resources.cpus[current];
+				model.usage_percentage = local_core.usage_percentage as f32;
+				model.free_percentage = local_core.free_percentage as f32;
+				
+				model
+					.clone()
+					.into_active_model()
+					.update(&self.db)
+					.await?;
+				
+				current += 1;
+			}
 			
-			// Still updating this is a pain
+			// Insert those that remain
+			let remaining = cpus.len() - current;
+			println!("Remaining: {}", remaining);
 			
-			// This is just a reference
-			// for system_core_instance in system_core_instances {
-			// 	system_core_instance.save(db).await?;
-			// }
+			// From the vector remove those that are before the current index
+			let mut remaining_instances = cpus
+                .iter()
+				// Skip all updated components
+                .skip(current)
+                .cloned()
+                .collect::<Vec<SystemCoreModel>>();
+			
+			// Insert remaining
+			for (_index, remaining_instance) in remaining_instances.iter_mut().enumerate() {
+                remaining_instance.system_resource_id = Some(self.id()?);
+                remaining_instance
+                    .clone()
+                    .into_active_model()
+                    .insert(&self.db)
+                    .await?;
+            }
 		}
 		
 		Ok(())
