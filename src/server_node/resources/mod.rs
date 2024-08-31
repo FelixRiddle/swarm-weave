@@ -4,10 +4,6 @@ use entity::{
 		Entity as StorageDeviceEntity,
 		ActiveModel as StorageDevice
 	},
-    system_core::{
-		Entity as SystemCoreEntity,
-        ActiveModel as SystemCore
-	},
     system_memory,
     system_resources::ActiveModel as SystemResources,
 };
@@ -22,7 +18,10 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use sysinfo::{Disks, System};
 
+pub mod system_core;
+
 use super::storage::Storage;
+use system_core::SystemCore as Cpu;
 
 /// Convert f64 to f32
 ///
@@ -34,95 +33,6 @@ pub fn to_f32(x: f64) -> Result<f32, Box<dyn Error>> {
     } else {
         Ok(y)
     }
-}
-
-/// TODO: Rename to CpuCore or Core
-/// 
-/// 
-#[derive(Deserialize, Serialize)]
-pub struct Cpu {
-    pub usage_percentage: f64,
-    pub free_percentage: f64,
-}
-
-/// Database and Resources
-/// 
-/// 
-impl Cpu {
-	/// Create system core instance
-	/// 
-	/// 
-	pub fn create_system_core_instance(
-		cpu: &Cpu,
-		system_resources_id: i64,
-	) -> Result<SystemCore, Box<dyn Error>> {
-		// Create system core
-		let system_core_instance = SystemCore {
-			usage_percentage: ActiveValue::Set(to_f32(cpu.usage_percentage)?),
-			free_percentage: ActiveValue::Set(to_f32(cpu.free_percentage)?),
-			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-			..Default::default() // all other attributes are `NotSet`
-		};
-
-		Ok(system_core_instance)
-	}
-	
-	/// Create cores from resources
-	/// 
-	/// 
-	pub fn create_cores(res: &Resources, system_resources_id: i64) -> Result<Vec<SystemCore>, Box<dyn Error>> {
-		let system_core_instances: Result<Vec<SystemCore>, Box<dyn Error>> = res
-            .cpus
-            .iter()
-            .map(|cpu| Cpu::create_system_core_instance(cpu, system_resources_id))
-            .collect();
-		
-		system_core_instances
-	}
-	
-	/// Update cores from resources
-	/// 
-	/// 
-	pub async fn update_cores(
-		res: &Resources,
-		system_resources_id: i64,
-		db: &DatabaseConnection,
-		system_resources_instance: SystemResources
-	) -> Result<(), Box<dyn Error>> {
-        // Update system cores
-        let system_core_instances = Cpu::create_cores(res, system_resources_id)?;
-		
-		// Cpus don't have identification
-		// Find related cpus
-		let cpus = system_resources_instance
-			.clone()
-			.try_into_model()?
-			.find_related(SystemCoreEntity)
-			.all(db)
-			.await?;
-		
-		// Remove difference
-		let diff = i32::try_from(cpus.len())? - i32::try_from(system_core_instances.len())?;
-		println!("Current instances: {}", system_core_instances.len());
-		println!("Existing instances: {}", cpus.len());
-		println!("Absolute difference: {}", diff);
-		// It's done like this because cores cannot be identified
-		if diff > 0 {
-			// We have to remove some, and update those that are new
-		} else {
-			// It's negative so there are less in the database
-			// let diff = diff * -1;
-			
-			// Still updating this is a pain
-			
-			// This is just a reference
-			// for system_core_instance in system_core_instances {
-			// 	system_core_instance.save(db).await?;
-			// }
-		}
-		
-		Ok(())
-	}
 }
 
 /// Ram memory
