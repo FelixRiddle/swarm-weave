@@ -7,9 +7,7 @@ use entity::{
     system_resources::ActiveModel as SystemResourcesActiveModel,
 };
 use sea_orm::{
-	ModelTrait,
-    ActiveValue,
-    DatabaseConnection, TryIntoModel,
+	ActiveModelTrait, ActiveValue, DatabaseConnection, IntoActiveModel, ModelTrait, TryIntoModel
 };
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -108,8 +106,8 @@ impl CpuCoreController {
 	pub async fn update_all_cores(
 		&self,
 	) -> Result<(), Box<dyn Error>> {
-        // Update system cores
-        let system_core_instances = self.create_cores()?;
+        // // Update system cores
+        // let local_cores = self.create_cores()?;
 		
 		// Cpus don't have identification
 		// Find related cpus
@@ -121,13 +119,15 @@ impl CpuCoreController {
 			.await?;
 		
 		// Remove difference
-		let diff = i32::try_from(cpus.len())? - i32::try_from(system_core_instances.len())?;
-		println!("Current instances: {}", system_core_instances.len());
+		let diff = i32::try_from(cpus.len())? - i32::try_from(self.system_resources.cpus.len())?;
+		println!("Current instances: {}", self.system_resources.cpus.len());
 		println!("Existing instances: {}", cpus.len());
 		println!("Absolute difference: {}", diff);
 		
 		// It's done like this because cores cannot be identified
 		if diff > 0 {
+			println!("There are more cores in the database than in the system");
+			
 			// Remove extras
 			let mut current: usize = 0;
 			while current < usize::try_from(diff)? {
@@ -144,15 +144,28 @@ impl CpuCoreController {
 			println!("Remaining: {}", remaining);
 			
 			// From the vector remove those that are before the current index
-			let remaining_instances = cpus
+			let mut remaining_instances = cpus
                 .iter()
                 .skip(current)
                 .cloned()
                 .collect::<Vec<SystemCoreModel>>();
             
             // Update remaining
-			
+			for (index, remaining_instance) in remaining_instances.iter_mut().enumerate() {
+				remaining_instance.usage_percentage = self.system_resources.cpus[index].usage_percentage as f32;
+				remaining_instance.free_percentage = self.system_resources.cpus[index].free_percentage as f32;
+				
+				remaining_instance
+					.clone()
+					.into_active_model()
+					.update(&self.db)
+					.await?;
+			}
+		} else if diff == 0 {
+			println!("Cores quantity hasn't changed");
 		} else {
+			println!("There are more cores locally than in the database");
+			
 			// It's negative so there are less in the database
 			// let diff = diff * -1;
 			
