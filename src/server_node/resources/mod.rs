@@ -22,8 +22,8 @@ pub mod system_core;
 
 use super::storage::Storage;
 use system_core::{
-	SystemCore as Cpu,
-	SystemCoreController,
+	CpuCore as Cpu,
+	CpuCoreController,
 };
 
 /// Convert f64 to f32
@@ -124,7 +124,7 @@ impl Resources {
 			.await?.id;
 		
         // Create system core instances
-		let system_core_controller = SystemCoreController::new(
+		let system_core_controller = CpuCoreController::new(
 			db.clone(),
 			self.clone(),
 			system_resources_instance.clone(),
@@ -180,7 +180,7 @@ impl Resources {
         };
 		
         // Update system cores
-		let system_core_controller = SystemCoreController::new(
+		let system_core_controller = CpuCoreController::new(
 			db.clone(),
 			self.clone(),
 			system_resources_instance.clone(),
@@ -316,78 +316,6 @@ mod tests {
 
         assert!(!storage_devices.is_empty());
     }
-	
-	#[tokio::test]
-	async fn test_update_system_cores() {
-        // Set environment variables
-        dotenv::dotenv().ok();
-
-        // Initialize database connection
-        let db = mysql_connection().await.unwrap();
-
-        // Fetch resources
-        let resources = Resources::fetch_resources().unwrap();
-
-        // Insert initial data
-        let resource_id = resources.insert_data(&db).await.unwrap();
-
-        // Update resources
-        let updated_resources = Resources {
-            cpus: vec![Cpu {
-                usage_percentage: 50.0,
-                free_percentage: 50.0,
-            }],
-            memory: Memory {
-                total: 8_589_934_592,
-                used: 4_294_967_296,
-            },
-            storage: vec![Storage {
-                name: String::from("Updated Storage"),
-                total: 1_000_000_000,
-                used: 500_000_000,
-                is_removable: true,
-                kind: DiskKind::HDD,
-            }],
-            eval_time: Utc::now(),
-        };
-		
-        // Get the ID of the inserted system resources
-        let res_model = SystemResources::find_by_id(resource_id)
-            .one(&db)
-            .await
-            .unwrap()
-            .unwrap();
-        let id: i64 = res_model.id;
-		
-        // Call the update function
-        updated_resources.update(id, &db).await.unwrap();
-		
-        // Verify that the data was updated correctly
-        let res_model = SystemResources::find_by_id(resource_id)
-            .one(&db)
-            .await
-            .unwrap()
-            .unwrap();
-		
-		// This test fails for a negligible difference
-        // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
-		
-		// Get system cores
-        let updated_system_cores = res_model.find_related(SystemCore)
-			.all(&db)
-			.await
-			.unwrap();
-
-        assert_eq!(updated_system_cores.len(), 1);
-        assert_eq!(
-            updated_system_cores[0].usage_percentage,
-            to_f32(updated_resources.cpus[0].usage_percentage).unwrap()
-        );
-        assert_eq!(
-            updated_system_cores[0].free_percentage,
-            to_f32(updated_resources.cpus[0].free_percentage).unwrap()
-        );
-	}
 	
 	#[tokio::test]
 	async fn test_update_system_memory() {

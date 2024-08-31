@@ -1,5 +1,6 @@
 use entity::{
     system_core::{
+		Model as SystemCoreModel,
 		Entity as SystemCoreEntity,
         ActiveModel as SystemCoreActiveModel
 	},
@@ -22,7 +23,7 @@ use super::{
 /// 
 /// 
 #[derive(Clone, Deserialize, Serialize)]
-pub struct SystemCore {
+pub struct CpuCore {
     pub usage_percentage: f64,
     pub free_percentage: f64,
 }
@@ -30,7 +31,7 @@ pub struct SystemCore {
 /// System core controller
 /// 
 /// Because I'm tired of using references
-pub struct SystemCoreController {
+pub struct CpuCoreController {
 	pub db: DatabaseConnection,
 	pub system_resources: Resources,
 	pub system_resources_instance: SystemResourcesActiveModel,
@@ -39,7 +40,7 @@ pub struct SystemCoreController {
 /// Database and Resources
 /// 
 /// 
-impl SystemCoreController {
+impl CpuCoreController {
 	/// Create new
 	/// 
 	/// 
@@ -73,7 +74,7 @@ impl SystemCoreController {
 	/// 
 	pub fn create_system_core_instance(
 		&self,
-		cpu: &SystemCore,
+		cpu: &CpuCore,
 	) -> Result<SystemCoreActiveModel, Box<dyn Error>> {
 		let system_resources_id = self.id()?;
 		
@@ -112,7 +113,7 @@ impl SystemCoreController {
 		
 		// Cpus don't have identification
 		// Find related cpus
-		let cpus = self.system_resources_instance
+		let cpus: Vec<SystemCoreModel> = self.system_resources_instance
 			.clone()
 			.try_into_model()?
 			.find_related(SystemCoreEntity)
@@ -127,17 +128,30 @@ impl SystemCoreController {
 		
 		// It's done like this because cores cannot be identified
 		if diff > 0 {
-			// TODO: We have to remove some, and update those that remain
 			// Remove extras
 			let mut current: usize = 0;
 			while current < usize::try_from(diff)? {
-				cpus[current]
-					.clone()
-					.delete(&self.db)
+				let model = cpus[current].clone();
+				
+				model.delete(&self.db)
 					.await?;
 				
 				current += 1;
 			}
+			
+			// Update those that remain
+			let remaining = cpus.len() - current;
+			println!("Remaining: {}", remaining);
+			
+			// From the vector remove those that are before the current index
+			let remaining_instances = cpus
+                .iter()
+                .skip(current)
+                .cloned()
+                .collect::<Vec<SystemCoreModel>>();
+            
+            // Update remaining
+			
 		} else {
 			// It's negative so there are less in the database
 			// let diff = diff * -1;
@@ -151,5 +165,109 @@ impl SystemCoreController {
 		}
 		
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+pub mod tests {
+	use chrono::Utc;
+	use entity::{
+		system_core::Entity as SystemCoreEntity,
+		system_resources::Entity as SystemResourcesEntity
+	};
+	use sea_orm::{EntityTrait, IntoActiveModel, ModelTrait};
+	
+    use crate::database::mysql_connection;
+	use crate::server_node::resources::to_f32;
+	use crate::server_node::{
+		resources::{
+			Resources,
+			Memory,
+		},
+		storage::{
+			DiskKind,
+			Storage,
+		}
+	};
+	use super::CpuCore;
+	use super::CpuCoreController;
+
+	#[tokio::test]
+	async fn test_update_system_cores() {
+        // Set environment variables
+        dotenv::dotenv().ok();
+		
+        // Initialize database connection
+        let db = mysql_connection().await.unwrap();
+		
+        // Fetch resources
+        let resources = Resources::fetch_resources().unwrap();
+		
+        // Insert initial data
+        let resource_id = resources.insert_data(&db).await.unwrap();
+		
+        // Verify that the data was inserted correctly
+		let system_resources_entity = SystemResourcesEntity::find_by_id(resource_id)
+			.one(&db)
+			.await
+			.unwrap()
+			.unwrap();
+		let cpu_core_ctrl = CpuCoreController::new(
+			db.clone(),
+            resources,
+            system_resources_entity.clone().into_active_model()
+        );
+		
+        // Get the ID of the inserted system resources
+        let id: i64 = system_resources_entity.id;
+		
+        // Update resources
+        let updated_resources = Resources {
+            cpus: vec![CpuCore {
+                usage_percentage: 50.0,
+                free_percentage: 50.0,
+            }],
+            memory: Memory {
+                total: 8_589_934_592,
+                used: 4_294_967_296,
+            },
+            storage: vec![Storage {
+                name: String::from("Updated Storage"),
+                total: 1_000_000_000,
+                used: 500_000_000,
+                is_removable: true,
+                kind: DiskKind::HDD,
+            }],
+            eval_time: Utc::now(),
+        };
+		
+        // Call the update function
+        updated_resources.update(id, &db).await.unwrap();
+		
+        // Verify that the data was updated correctly
+		let res_model = SystemResourcesEntity::find_by_id(resource_id)
+			.one(&db)
+			.await
+			.unwrap()
+			.unwrap();
+		
+		// This test fails for a negligible difference
+        // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
+		
+		// Get system cores
+        let updated_system_cores = res_model.find_related(SystemCoreEntity)
+			.all(&db)
+			.await
+			.unwrap();
+
+        assert_eq!(updated_system_cores.len(), 1);
+        assert_eq!(
+            updated_system_cores[0].usage_percentage,
+            to_f32(updated_resources.cpus[0].usage_percentage).unwrap()
+        );
+        assert_eq!(
+            updated_system_cores[0].free_percentage,
+            to_f32(updated_resources.cpus[0].free_percentage).unwrap()
+        );
 	}
 }
