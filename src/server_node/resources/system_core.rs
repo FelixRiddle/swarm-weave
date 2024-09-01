@@ -117,8 +117,8 @@ impl CpuCoreController {
 		
 		// Remove difference
 		let diff = i32::try_from(cpus.len())? - i32::try_from(self.system_resources.cpus.len())?;
-		println!("Current instances: {}", self.system_resources.cpus.len());
-		println!("Existing instances: {}", cpus.len());
+		println!("Current instances locally: {}", self.system_resources.cpus.len());
+		println!("Existing instances in the database: {}", cpus.len());
 		println!("Absolute difference: {}", diff);
 		
 		// It's done like this because cores cannot be identified
@@ -173,6 +173,10 @@ impl CpuCoreController {
 			}
 		} else {
 			println!("There are more cores locally than in the database");
+			
+			// Flip the sign
+			let diff = diff * -1;
+			println!("Diff: {diff}");
 			
 			// Update the first cores
 			let mut current: usize = 0;
@@ -469,7 +473,10 @@ pub mod tests {
         };
         
         // Call the update function
-        updated_resources.update(resource_id, &db).await.unwrap();
+        updated_resources
+			.update(resource_id, &db)
+			.await
+			.unwrap();
         
         // Verify that the data was updated correctly
         let res_model = SystemResourcesEntity::find_by_id(resource_id)
