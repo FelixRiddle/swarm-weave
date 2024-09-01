@@ -9,10 +9,7 @@ use entity::{
 };
 // use futures::{executor::ThreadPool, join};
 use sea_orm::{
-	ModelTrait,
-    ActiveModelTrait,
-    ActiveValue,
-    DatabaseConnection, TryIntoModel,
+	ActiveModelTrait, ActiveValue, DatabaseConnection, IntoActiveModel, ModelTrait, TryIntoModel
 };
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -114,25 +111,28 @@ impl Resources {
     /// Returns system resources id
     pub async fn insert_data(&self, db: &DatabaseConnection) -> Result<i64, Box<dyn Error>> {
         // Create and insert resources
-        let system_resources_instance = SystemResources {
+        let local_system_resources_instance = SystemResources {
             eval_time: ActiveValue::Set(self.eval_time.naive_utc()),
             ..Default::default() // all other attributes are `NotSet`
         };
-        let system_resources_id = system_resources_instance
+        let inserted_system_resources = local_system_resources_instance
 			.clone()
 			.insert(db)
-			.await?.id;
+			.await?;
 		
         // Create system core instances
 		let system_core_controller = CpuCoreController::new(
 			db.clone(),
 			self.clone(),
-			system_resources_instance.clone(),
+			inserted_system_resources.into_active_model(),
 		);
         let system_core_instances = system_core_controller.create_cores()?;
         for system_core_instance in system_core_instances {
             system_core_instance.save(db).await?;
         }
+		
+		// Take the id
+		let system_resources_id = system_core_controller.id()?;
 		
         // System memory instance
         let system_memory_instance = system_memory::ActiveModel {
@@ -395,16 +395,24 @@ mod tests {
 	async fn test_update_storage_device() {
         // Set environment variables
         dotenv::dotenv().ok();
-
+		
         // Initialize database connection
         let db = mysql_connection().await.unwrap();
-
+		
         // Fetch resources
         let resources = Resources::fetch_resources().unwrap();
 		
         // Insert initial data
         let resource_id = resources.insert_data(&db).await.unwrap();
-
+		
+        // Get the ID of the inserted system resources
+        let res_model = SystemResources::find_by_id(resource_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        let id: i64 = res_model.id;
+		
         // Update resources
         let updated_resources = Resources {
             cpus: vec![Cpu {
@@ -424,27 +432,16 @@ mod tests {
             }],
             eval_time: Utc::now(),
         };
-
-        // Get the ID of the inserted system resources
-        let res_model = SystemResources::find_by_id(resource_id)
-            .one(&db)
-            .await
-            .unwrap()
-            .unwrap();
-        let id: i64 = res_model.id;
-
+		
         // Call the update function
         updated_resources.update(id, &db).await.unwrap();
-
+		
         // Verify that the data was updated correctly
         let res_model = SystemResources::find_by_id(resource_id)
             .one(&db)
             .await
             .unwrap()
             .unwrap();
-
-		// This test fails for a negligible difference
-        // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
 		
 		// Get storage devices
         let updated_storage_devices = res_model.find_related(StorageDevice)
@@ -452,6 +449,8 @@ mod tests {
 			.await
 			.unwrap();
 		
+		// This test fails for a negligible difference
+        // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
         assert_eq!(updated_storage_devices.len(), 1);
         assert_eq!(
             updated_storage_devices[0].name,

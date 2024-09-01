@@ -477,16 +477,16 @@ pub mod tests {
             .await
             .unwrap()
             .unwrap();
-        
+		
         // This test fails for a negligible difference
         // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
-        
+		
         // Get system cores
         let updated_system_cores = res_model.find_related(SystemCoreEntity)
             .all(&db)
             .await
             .unwrap();
-
+		
         assert_eq!(updated_system_cores.len(), 3);
         assert_eq!(
             updated_system_cores[0].usage_percentage,
