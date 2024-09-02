@@ -5,12 +5,14 @@ use entity::{
     system_resources::ActiveModel as SystemResourcesActiveModel,
 };
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, DatabaseConnection, IntoActiveModel, ModelTrait, TryIntoModel,
+    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait, Order, QueryFilter, TryIntoModel
 };
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
 use super::{to_f32, Resources};
+
+type SystemCoreColumn = <entity::prelude::SystemCore as EntityTrait>::Column;
 
 /// TODO: Rename to CpuCore or Core
 ///
@@ -22,7 +24,7 @@ pub struct CpuCore {
 }
 
 /// System core controller
-/// 
+///
 /// Because I'm tired of using references
 pub struct CpuCoreController {
     pub db: DatabaseConnection,
@@ -100,141 +102,142 @@ impl CpuCoreController {
 
         system_core_instances
     }
-	
-	/// Update all cores
-	/// 
-	/// 
-	pub async fn update_all_cores(&self) -> Result<(), Box<dyn Error>> {
-		// Cpus don't have identification
-		// Find related cpus
-		let mut cpus: Vec<SystemCoreModel> = self
-			.system_resources_instance
-			.clone()
-			.try_into_model()?
-			.find_related(SystemCoreEntity)
-			.all(&self.db)
-			.await?;
-	
-		let local_cpus_quantity = i32::try_from(self.system_resources.cpus.len())?;
-	
-		// Remove difference
-		let diff = i32::try_from(cpus.len())? - local_cpus_quantity;
-		println!(
-			"Local: {}",
-			self.system_resources.cpus.len()
-		);
-		println!("Database: {}", cpus.len());
-		println!("Absolute difference: {}", diff);
-	
-		// It's done like this because cores cannot be identified
-		if diff > 0 {
-			println!("There are more cores in the database than in the system");
-	
-			// Flip the sign
-			let diff = diff * -1;
-			println!("Diff: {diff}");
-	
-			let cores_to_update = local_cpus_quantity - diff;
-			println!("Updating {cores_to_update} cores");
+
+    /// Update all cores
+    ///
+    ///
+    pub async fn update_all_cores(&self) -> Result<(), Box<dyn Error>> {
+        // Cpus don't have identification
+        // Find related cpus
+        let mut cpus: Vec<SystemCoreModel> = self
+            .system_resources_instance
+            .clone()
+            .try_into_model()?
+            .find_related(SystemCoreEntity)
+            .all(&self.db)
+            .await?;
+
+        let local_cpus_quantity = i32::try_from(self.system_resources.cpus.len())?;
+
+        // Remove difference
+        let diff = i32::try_from(cpus.len())? - local_cpus_quantity;
+        println!("Local: {}", self.system_resources.cpus.len());
+        println!("Database: {}", cpus.len());
+        println!("Absolute difference: {}", diff);
+		
+        // It's done like this because cores cannot be identified
+        if diff > 0 {
+            println!("There are more cores in the database than in the system");
 			
-			// Remove extras
-			let mut current: usize = 0;
-			while current < usize::try_from(diff)? {
-				let model = cpus[current].clone();
-
-				model.delete(&self.db).await?;
-
-				// Update the current index
-				current += 1;
-
-				// Remove the deleted instance from the cpus vector
-				cpus.remove(current - 1);
-			}
+			// This is crazy
+			// Sort by id and then get the difference as index smallest id
+			// From there onwards we can delete records from the database
+			cpus.sort_by_key(|cpu| cpu.id);
+			let diffth_smallest_id = cpus[diff as usize].id;
 			
-			// Update those that remain
-			let remaining = cpus.len() - current;
-			println!("Remaining: {}", remaining);
-	
-			// From the vector remove those that are before the current index
-			let mut remaining_instances = cpus
-				.iter()
-				.skip(current)
-				.cloned()
-				.collect::<Vec<SystemCoreModel>>();
-	
-			// Update remaining
-			for (index, remaining_instance) in remaining_instances.iter_mut().enumerate() {
-				remaining_instance.usage_percentage =
-					self.system_resources.cpus[index].usage_percentage as f32;
-				remaining_instance.free_percentage =
-					self.system_resources.cpus[index].free_percentage as f32;
-	
-				remaining_instance
-					.clone()
-					.into_active_model()
-					.update(&self.db)
-					.await?;
-			}
-		} else if diff == 0 {
-			println!("Cores quantity hasn't changed");
-			for (index, cpu_core) in cpus.iter_mut().enumerate() {
-				let local_core = &self.system_resources.cpus[index];
-	
-				// Check if the local CPU usage has changed
-				if cpu_core.usage_percentage != local_core.usage_percentage as f32
-					|| cpu_core.free_percentage != local_core.free_percentage as f32
-				{
-					cpu_core.usage_percentage = local_core.usage_percentage as f32;
-					cpu_core.free_percentage = local_core.free_percentage as f32;
-	
-					cpu_core
-						.clone()
-						.into_active_model()
-						.update(&self.db)
-						.await?;
-				}
-			}
-		} else {
-			println!("There are more cores locally than in the database");
-
-			// Update all existing cores in the database
-			let cores_to_update = cpus.len();
-
-			// Update the first cores
-			let mut current: usize = 0;
-			while current < cores_to_update {
-				let mut model = cpus[current].clone();
-
-				let local_core = &self.system_resources.cpus[current];
-				model.usage_percentage = local_core.usage_percentage as f32;
-				model.free_percentage = local_core.free_percentage as f32;
-
-				model.clone().into_active_model().update(&self.db).await?;
-
-				current += 1;
-			}
-
-			// Insert the remaining new cores
-			let mut remaining_instances: Vec<CpuCore> = self.system_resources.cpus
-				.iter()
-				.skip(current)
-				.cloned()
-				.collect();
+			// Remove the last diff number of elements
+			SystemCoreEntity::delete_many()
+				.filter(
+					Condition::all()
+						.add(SystemCoreColumn::SystemResourceId.eq(self.id()?))
+						.add(SystemCoreColumn::Id.gte(diffth_smallest_id))
+				)
+				.exec(&self.db)
+				.await?;
 			
-			for (_index, remaining_instance) in remaining_instances.iter_mut().enumerate() {
-				let system_core = self.create_system_core_instance(remaining_instance)?;
+            println!("Cores removed");
+			
+            // Reload the cpus vector from the database
+            cpus = self
+                .system_resources_instance
+                .clone()
+                .try_into_model()?
+                .find_related(SystemCoreEntity)
+                .all(&self.db)
+                .await?;
+			
+            println!("Database cores: {}", cpus.len());
+			
+            // Check that the cpus vector has been truncated to the correct length
+            assert_eq!(cpus.len(), local_cpus_quantity as usize);
+			
+            // Update the remaining cores
+            for (index, cpu_core) in cpus.iter_mut().enumerate() {
+                if index < self.system_resources.cpus.len() {
+                    let local_core = &self.system_resources.cpus[index];
+					
+                    cpu_core.usage_percentage = local_core.usage_percentage as f32;
+                    cpu_core.free_percentage = local_core.free_percentage as f32;
+					
+                    cpu_core
+                        .clone()
+                        .into_active_model()
+                        .update(&self.db)
+                        .await?;
+                }
+            }
+        } else if diff == 0 {
+            println!("Cores quantity hasn't changed");
+            for (index, cpu_core) in cpus.iter_mut().enumerate() {
+                let local_core = &self.system_resources.cpus[index];
 
-				// Handle insertion errors
-				if let Err(e) = system_core.clone().insert(&self.db).await {
-					// Log or handle the error
-					println!("Error inserting core: {}", e);
-				}
-			}
-		}
-	
-		Ok(())
-	}
-	
+                // Check if the local CPU usage has changed
+                if cpu_core.usage_percentage != local_core.usage_percentage as f32
+                    || cpu_core.free_percentage != local_core.free_percentage as f32
+                {
+                    cpu_core.usage_percentage = local_core.usage_percentage as f32;
+                    cpu_core.free_percentage = local_core.free_percentage as f32;
+
+                    cpu_core
+                        .clone()
+                        .into_active_model()
+                        .update(&self.db)
+                        .await?;
+                }
+            }
+        } else {
+            println!("There are more cores locally than in the database");
+
+            // Update all existing cores in the database
+            let cores_to_update = cpus.len();
+
+            // Update the first cores
+            let mut current: usize = 0;
+            while current < cores_to_update {
+                let mut model = cpus[current].clone();
+
+                let local_core = &self.system_resources.cpus[current];
+                model.usage_percentage = local_core.usage_percentage as f32;
+                model.free_percentage = local_core.free_percentage as f32;
+
+                model.clone().into_active_model().update(&self.db).await?;
+
+                current += 1;
+            }
+
+            // Insert the remaining new cores
+            let mut remaining_instances: Vec<CpuCore> = self
+                .system_resources
+                .cpus
+                .iter()
+                .skip(current)
+                .cloned()
+                .collect();
+
+            for (_index, remaining_instance) in remaining_instances.iter_mut().enumerate() {
+                let system_core = self.create_system_core_instance(remaining_instance)?;
+
+                // Handle insertion errors
+                if let Err(e) = system_core.clone().insert(&self.db).await {
+                    // Log or handle the error
+                    println!("Error inserting core: {}", e);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Update cores from resources
     ///
     ///
@@ -248,9 +251,9 @@ impl CpuCoreController {
             .find_related(SystemCoreEntity)
             .all(&self.db)
             .await?;
-		
-		let local_cpus_quantity = i32::try_from(self.system_resources.cpus.len())?;
-		
+
+        let local_cpus_quantity = i32::try_from(self.system_resources.cpus.len())?;
+
         // Remove difference
         let diff = i32::try_from(cpus.len())? - local_cpus_quantity;
         println!(
@@ -263,14 +266,14 @@ impl CpuCoreController {
         // It's done like this because cores cannot be identified
         if diff < 0 {
             println!("There are more cores in the database than in the system");
-			
+
             // Flip the sign
             let diff = diff * -1;
             println!("Diff: {diff}");
-			
-			let cores_to_update = local_cpus_quantity - diff;
-			println!("Updating {cores_to_update} cores");
-			
+
+            let cores_to_update = local_cpus_quantity - diff;
+            println!("Updating {cores_to_update} cores");
+
             // Remove extras
             let mut current: usize = 0;
             while current < usize::try_from(diff)? {
@@ -320,11 +323,11 @@ impl CpuCoreController {
             }
         } else {
             println!("There are more cores locally than in the database");
-			
+
             println!("Diff: {diff}");
-			
-			let cores_to_update = local_cpus_quantity - diff;
-			println!("Updating {cores_to_update} cores");
+
+            let cores_to_update = local_cpus_quantity - diff;
+            println!("Updating {cores_to_update} cores");
 
             // Update the first cores
             let mut current: usize = 0;
@@ -339,28 +342,27 @@ impl CpuCoreController {
 
                 current += 1;
             }
-			
-			println!("Updated {current} cores");
-			
+
+            println!("Updated {current} cores");
+
             // These are the remaining instances to insert
-            let mut remaining_instances: Vec<CpuCore> = self.system_resources.cpus
+            let mut remaining_instances: Vec<CpuCore> = self
+                .system_resources
+                .cpus
                 .iter()
                 // Skip all updated components
                 .skip(current)
                 .cloned()
                 .collect();
-			
+
             // Insert those that remain
             let remaining = remaining_instances.len();
             println!("Remaining to insert: {}", remaining);
-			
+
             // Insert remaining
             for (_index, remaining_instance) in remaining_instances.iter_mut().enumerate() {
-				let system_core = self.create_system_core_instance(remaining_instance)?;
-                system_core
-                    .clone()
-                    .insert(&self.db)
-                    .await?;
+                let system_core = self.create_system_core_instance(remaining_instance)?;
+                system_core.clone().insert(&self.db).await?;
             }
         }
 
@@ -384,282 +386,198 @@ pub mod tests {
         storage::{DiskKind, Storage},
     };
 
-    // /// Update when there are less system cores locally than in the database
-    // ///
-    // ///
-    // #[tokio::test]
-    // async fn test_update_with_less() {
-    //     // Set environment variables
-    //     dotenv::dotenv().ok();
+    /// Update when there are less system cores locally than in the database
+    ///
+    ///
+    #[tokio::test]
+    async fn test_update_with_less() {
+        // Set environment variables
+        dotenv::dotenv().ok();
 
-    //     // Initialize database connection
-    //     let db = mysql_connection().await.unwrap();
+        // Initialize database connection
+        let db = mysql_connection().await.unwrap();
 
-    //     // Fetch resources
-    //     let resources = Resources::fetch_resources().unwrap();
+        // Fetch resources
+        let resources = Resources::fetch_resources().unwrap();
 
-    //     // Insert initial data
-    //     let resource_id: i64 = resources.insert_data(&db).await.unwrap();
+        // Insert initial data
+        let resource_id: i64 = resources.insert_data(&db).await.unwrap();
 
-    //     // Update resources
-    //     let updated_resources = Resources {
-    //         cpus: vec![CpuCore {
-    //             usage_percentage: 50.0,
-    //             free_percentage: 50.0,
-    //         }],
-    //         memory: Memory {
-    //             total: 8_589_934_592,
-    //             used: 4_294_967_296,
-    //         },
-    //         storage: vec![Storage {
-    //             name: String::from("Updated Storage"),
-    //             total: 1_000_000_000,
-    //             used: 500_000_000,
-    //             is_removable: true,
-    //             kind: DiskKind::HDD,
-    //         }],
-    //         eval_time: Utc::now(),
-    //     };
+        // Update resources
+        let updated_resources = Resources {
+            cpus: vec![CpuCore {
+                usage_percentage: 50.0,
+                free_percentage: 50.0,
+            }],
+            memory: Memory {
+                total: 8_589_934_592,
+                used: 4_294_967_296,
+            },
+            storage: vec![Storage {
+                name: String::from("Updated Storage"),
+                total: 1_000_000_000,
+                used: 500_000_000,
+                is_removable: true,
+                kind: DiskKind::HDD,
+            }],
+            eval_time: Utc::now(),
+        };
 
-    //     // Call the update function
-    //     updated_resources.update(resource_id, &db).await.unwrap();
+        // Call the update function
+        updated_resources.update(resource_id, &db).await.unwrap();
 
-    //     // Verify that the data was updated correctly
-    //     let res_model = SystemResourcesEntity::find_by_id(resource_id)
-    //         .one(&db)
-    //         .await
-    //         .unwrap()
-    //         .unwrap();
+        // Verify that the data was updated correctly
+        let res_model = SystemResourcesEntity::find_by_id(resource_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
 
-    //     // This test fails for a negligible difference
-    //     // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
+        // This test fails for a negligible difference
+        // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
 
-    //     // Get system cores
-    //     let updated_system_cores = res_model
-    //         .find_related(SystemCoreEntity)
-    //         .all(&db)
-    //         .await
-    //         .unwrap();
+        // Get system cores
+        let updated_system_cores = res_model
+            .find_related(SystemCoreEntity)
+            .all(&db)
+            .await
+            .unwrap();
 
-    //     assert_eq!(updated_system_cores.len(), 1);
-    //     assert_eq!(
-    //         updated_system_cores[0].usage_percentage,
-    //         to_f32(updated_resources.cpus[0].usage_percentage).unwrap()
-    //     );
-    //     assert_eq!(
-    //         updated_system_cores[0].free_percentage,
-    //         to_f32(updated_resources.cpus[0].free_percentage).unwrap()
-    //     );
-    // }
+        assert_eq!(updated_system_cores.len(), updated_resources.cpus.len());
+        assert_eq!(
+            updated_system_cores[0].usage_percentage,
+            to_f32(updated_resources.cpus[0].usage_percentage).unwrap()
+        );
+        assert_eq!(
+            updated_system_cores[0].free_percentage,
+            to_f32(updated_resources.cpus[0].free_percentage).unwrap()
+        );
+    }
 
-    // /// Test update equal
-    // ///
-    // /// Update when there is the same time of cores locally and in the database
-    // #[tokio::test]
-    // async fn test_update_equal() {
-    //     // Set environment variables
-    //     dotenv::dotenv().ok();
+    /// Test update equal
+    ///
+    /// Update when there is the same time of cores locally and in the database
+    #[tokio::test]
+    async fn test_update_equal() {
+        // Set environment variables
+        dotenv::dotenv().ok();
 
-    //     // Initialize database connection
-    //     let db = mysql_connection().await.unwrap();
+        // Initialize database connection
+        let db = mysql_connection().await.unwrap();
 
-    //     // Fetch resources
-    //     let resources = Resources::fetch_resources().unwrap();
+        // Update resources
+        let resources = Resources {
+            cpus: vec![
+                CpuCore {
+                    usage_percentage: 50.0,
+                    free_percentage: 50.0,
+                },
+                CpuCore {
+                    usage_percentage: 60.0,
+                    free_percentage: 40.0,
+                },
+            ],
+            memory: Memory {
+                total: 8_589_934_592,
+                used: 4_294_967_296,
+            },
+            storage: vec![
+                Storage {
+                    name: String::from("Updated Storage 1"),
+                    total: 1_000_000_000,
+                    used: 500_000_000,
+                    is_removable: true,
+                    kind: DiskKind::HDD,
+                },
+                Storage {
+                    name: String::from("Updated Storage 2"),
+                    total: 1_000_000_000,
+                    used: 500_000_000,
+                    is_removable: true,
+                    kind: DiskKind::SSD,
+                },
+            ],
+            eval_time: Utc::now(),
+        };
 
-    //     // Insert initial data
-    //     let resource_id: i64 = resources.insert_data(&db).await.unwrap();
+        // Insert initial data
+        let resource_id: i64 = resources.insert_data(&db).await.unwrap();
 
-    //     // Update resources
-    //     let updated_resources = Resources {
-    //         cpus: vec![
-    //             CpuCore {
-    //                 usage_percentage: 50.0,
-    //                 free_percentage: 50.0,
-    //             },
-    //             CpuCore {
-    //                 usage_percentage: 60.0,
-    //                 free_percentage: 40.0,
-    //             },
-    //         ],
-    //         memory: Memory {
-    //             total: 8_589_934_592,
-    //             used: 4_294_967_296,
-    //         },
-    //         storage: vec![
-    //             Storage {
-    //                 name: String::from("Updated Storage 1"),
-    //                 total: 1_000_000_000,
-    //                 used: 500_000_000,
-    //                 is_removable: true,
-    //                 kind: DiskKind::HDD,
-    //             },
-    //             Storage {
-    //                 name: String::from("Updated Storage 2"),
-    //                 total: 1_000_000_000,
-    //                 used: 500_000_000,
-    //                 is_removable: true,
-    //                 kind: DiskKind::SSD,
-    //             },
-    //         ],
-    //         eval_time: Utc::now(),
-    //     };
+        // Update resources
+        let updated_resources = Resources {
+            cpus: vec![
+                CpuCore {
+                    usage_percentage: 30.0,
+                    free_percentage: 70.0,
+                },
+                CpuCore {
+                    usage_percentage: 40.0,
+                    free_percentage: 60.0,
+                },
+            ],
+            memory: Memory {
+                total: 8_589_934_592,
+                used: 4_294_967_296,
+            },
+            storage: vec![
+                Storage {
+                    name: String::from("Updated Storage 1"),
+                    total: 1_000_000_000,
+                    used: 500_000_000,
+                    is_removable: true,
+                    kind: DiskKind::HDD,
+                },
+                Storage {
+                    name: String::from("Updated Storage 2"),
+                    total: 1_000_000_000,
+                    used: 500_000_000,
+                    is_removable: true,
+                    kind: DiskKind::SSD,
+                },
+            ],
+            eval_time: Utc::now(),
+        };
 
-    //     // Call the update function
-    //     updated_resources.update(resource_id, &db).await.unwrap();
+        // Call the update function
+        updated_resources.update(resource_id, &db).await.unwrap();
 
-    //     // Verify that the data was updated correctly
-    //     let res_model = SystemResourcesEntity::find_by_id(resource_id)
-    //         .one(&db)
-    //         .await
-    //         .unwrap()
-    //         .unwrap();
+        // Verify that the data was updated correctly
+        let res_model = SystemResourcesEntity::find_by_id(resource_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
 
-    //     // This test fails for a negligible difference
-    //     // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
+        // This test fails for a negligible difference
+        // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
 
-    //     // Get system cores
-    //     let updated_system_cores = res_model
-    //         .find_related(SystemCoreEntity)
-    //         .all(&db)
-    //         .await
-    //         .unwrap();
+        // Get system cores
+        let updated_system_cores = res_model
+            .find_related(SystemCoreEntity)
+            .all(&db)
+            .await
+            .unwrap();
 
-    //     assert_eq!(updated_system_cores.len(), 2);
-    //     assert_eq!(
-    //         updated_system_cores[0].usage_percentage,
-    //         to_f32(updated_resources.cpus[0].usage_percentage).unwrap()
-    //     );
-    //     assert_eq!(
-    //         updated_system_cores[0].free_percentage,
-    //         to_f32(updated_resources.cpus[0].free_percentage).unwrap()
-    //     );
-    //     assert_eq!(
-    //         updated_system_cores[1].usage_percentage,
-    //         to_f32(updated_resources.cpus[1].usage_percentage).unwrap()
-    //     );
-    //     assert_eq!(
-    //         updated_system_cores[1].free_percentage,
-    //         to_f32(updated_resources.cpus[1].free_percentage).unwrap()
-    //     );
-    // }
+        assert_eq!(updated_system_cores.len(), 2);
+        assert_eq!(
+            updated_system_cores[0].usage_percentage,
+            to_f32(updated_resources.cpus[0].usage_percentage).unwrap()
+        );
+        assert_eq!(
+            updated_system_cores[0].free_percentage,
+            to_f32(updated_resources.cpus[0].free_percentage).unwrap()
+        );
+        assert_eq!(
+            updated_system_cores[1].usage_percentage,
+            to_f32(updated_resources.cpus[1].usage_percentage).unwrap()
+        );
+        assert_eq!(
+            updated_system_cores[1].free_percentage,
+            to_f32(updated_resources.cpus[1].free_percentage).unwrap()
+        );
+    }
 
     /// Test update more
-    ///
-    /// Update when there are more cores locally than in the database
-    // #[tokio::test]
-    // async fn test_update_more() {
-    //     // Set environment variables
-    //     dotenv::dotenv().ok();
-
-    //     // Initialize database connection
-    //     let db = mysql_connection().await.unwrap();
-
-    //     // Fetch resources
-    //     let resources = Resources::fetch_resources().unwrap();
-
-    //     // Insert initial data
-    //     let resource_id: i64 = resources.insert_data(&db).await.unwrap();
-
-    //     // Create system cores based on the updated resources
-    //     let mut system_cores = resources.cpus.clone();
-
-    //     // Update resources
-    //     let new_cores = vec![
-    //         CpuCore {
-    //             usage_percentage: 50.0,
-    //             free_percentage: 50.0,
-    //         },
-    //         CpuCore {
-    //             usage_percentage: 60.0,
-    //             free_percentage: 40.0,
-    //         },
-    //         CpuCore {
-    //             usage_percentage: 70.0,
-    //             free_percentage: 30.0,
-    //         },
-    //     ];
-    //     system_cores.extend(new_cores);
-
-    //     let updated_resources = Resources {
-    //         cpus: system_cores,
-    //         memory: Memory {
-    //             total: 8_589_934_592,
-    //             used: 4_294_967_296,
-    //         },
-    //         storage: vec![
-    //             Storage {
-    //                 name: String::from("Updated Storage 1"),
-    //                 total: 1_000_000_000,
-    //                 used: 500_000_000,
-    //                 is_removable: true,
-    //                 kind: DiskKind::HDD,
-    //             },
-    //             Storage {
-    //                 name: String::from("Updated Storage 2"),
-    //                 total: 1_000_000_000,
-    //                 used: 500_000_000,
-    //                 is_removable: true,
-    //                 kind: DiskKind::SSD,
-    //             },
-    //             Storage {
-    //                 name: String::from("Updated Storage 3"),
-    //                 total: 1_000_000_000,
-    //                 used: 500_000_000,
-    //                 is_removable: true,
-    //                 kind: DiskKind::SSD,
-    //             },
-    //         ],
-    //         eval_time: Utc::now(),
-    //     };
-
-    //     // Call the update function
-    //     updated_resources.update(resource_id, &db).await.unwrap();
-
-    //     // Verify that the data was updated correctly
-    //     let res_model = SystemResourcesEntity::find_by_id(resource_id)
-    //         .one(&db)
-    //         .await
-    //         .unwrap()
-    //         .unwrap();
-
-    //     // This test fails for a negligible difference
-    //     // assert_eq!(res_model.eval_time, updated_resources.eval_time.naive_utc());
-
-    //     // Get system cores
-    //     let updated_system_cores = res_model
-    //         .find_related(SystemCoreEntity)
-    //         .all(&db)
-    //         .await
-    //         .unwrap();
-
-    //     assert_eq!(updated_system_cores.len(), 3);
-    //     assert_eq!(
-    //         updated_system_cores[0].usage_percentage,
-    //         to_f32(updated_resources.cpus[0].usage_percentage).unwrap()
-    //     );
-    //     assert_eq!(
-    //         updated_system_cores[0].free_percentage,
-    //         to_f32(updated_resources.cpus[0].free_percentage).unwrap()
-    //     );
-    //     assert_eq!(
-    //         updated_system_cores[1].usage_percentage,
-    //         to_f32(updated_resources.cpus[1].usage_percentage).unwrap()
-    //     );
-    //     assert_eq!(
-    //         updated_system_cores[1].free_percentage,
-    //         to_f32(updated_resources.cpus[1].free_percentage).unwrap()
-    //     );
-    //     assert_eq!(
-    //         updated_system_cores[2].usage_percentage,
-    //         to_f32(updated_resources.cpus[2].usage_percentage).unwrap()
-    //     );
-    //     assert_eq!(
-    //         updated_system_cores[2].free_percentage,
-    //         to_f32(updated_resources.cpus[2].free_percentage).unwrap()
-    //     );
-    // }
-	
-	/// Test update more
     ///
     /// Update when there are more cores locally than in the database
     #[tokio::test]
@@ -727,36 +645,36 @@ pub mod tests {
             ],
             eval_time: Utc::now(),
         };
-		
+
         // Call the update function
-		updated_resources.update(resource_id, &db).await.unwrap();
+        updated_resources.update(resource_id, &db).await.unwrap();
 
-		// Verify that the data was updated correctly
-		let res_model = SystemResourcesEntity::find_by_id(resource_id)
-			.one(&db)
-			.await
-			.unwrap()
-			.unwrap();
+        // Verify that the data was updated correctly
+        let res_model = SystemResourcesEntity::find_by_id(resource_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
 
-		// Get system cores
-		let updated_system_cores = res_model
-			.find_related(SystemCoreEntity)
-			.all(&db)
-			.await
-			.unwrap();
-		
-		let total_cores = system_cores.len();
-		assert_eq!(updated_system_cores.len(), total_cores);
+        // Get system cores
+        let updated_system_cores = res_model
+            .find_related(SystemCoreEntity)
+            .all(&db)
+            .await
+            .unwrap();
 
-		for (i, core) in updated_system_cores.iter().enumerate() {
-			assert_eq!(
-				core.usage_percentage,
-				to_f32(updated_resources.cpus[i].usage_percentage).unwrap()
-			);
-			assert_eq!(
-				core.free_percentage,
-				to_f32(updated_resources.cpus[i].free_percentage).unwrap()
-			);
-		}
+        let total_cores = system_cores.len();
+        assert_eq!(updated_system_cores.len(), total_cores);
+
+        for (i, core) in updated_system_cores.iter().enumerate() {
+            assert_eq!(
+                core.usage_percentage,
+                to_f32(updated_resources.cpus[i].usage_percentage).unwrap()
+            );
+            assert_eq!(
+                core.free_percentage,
+                to_f32(updated_resources.cpus[i].free_percentage).unwrap()
+            );
+        }
     }
 }
