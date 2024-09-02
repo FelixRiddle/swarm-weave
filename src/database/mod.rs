@@ -21,30 +21,35 @@ pub async fn mysql_connection() -> Result<DatabaseConnection, Box<dyn Error>> {
 }
 
 // Cannot run test because environment variables are not set.
-// #[cfg(test)]
-// mod tests {
-//     use sea_orm::DbErr;
-
-//     use super::*;
-    
-//     /// Test the MySQL connection
-//     /// 
-//     /// Requires to have environment variables set
-//     #[tokio::test]
-//     async fn test_mysql_connection() {
-//         // Parse environment variables
-//         dotenv::dotenv().ok();
+// FIXME: This should work now, as I figured out how to fix it
+#[cfg(test)]
+mod tests {
+    use sea_orm::DbErr;
+	
+    use super::*;
+	
+    /// Test the MySQL connection
+    /// 
+    /// Requires to have environment variables set
+    #[tokio::test]
+    async fn test_mysql_connection() {
+        // Parse environment variables
+        dotenv::dotenv().ok();
+		
+		// INFO: If you run it again, this will not do anything, I don't know why.
+		// The expected behavior is to reset environment variables to whatever the .env file has
+        // dotenv::dotenv().ok();
         
-//         let connection = mysql_connection().await.unwrap();
+        let connection = mysql_connection().await.unwrap();
         
-//         assert!(connection.ping().await.is_ok());
-//         connection.clone().close().await.unwrap();
+        assert!(connection.ping().await.is_ok());
+        connection.clone().close().await.unwrap();
         
-//         assert!(
-//             matches!(
-//                 connection.ping().await,
-//                 Err(DbErr::ConnectionAcquire(_))
-//             )
-//         );
-//     }
-// }
+        assert!(
+            matches!(
+                connection.ping().await,
+                Err(DbErr::ConnectionAcquire(_))
+            )
+        );
+    }
+}

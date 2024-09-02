@@ -11,6 +11,8 @@ pub use resources::Resources;
 pub use system_info::SystemInfo;
 pub use server_info::ServerInfo;
 
+use crate::database::mysql_connection;
+
 #[derive(Debug, PartialEq)]
 #[derive(Deserialize, Serialize)]
 pub enum ServerStatus {
@@ -46,6 +48,19 @@ impl ServerNode {
 pub struct ServerNodeController {
 	pub db: DatabaseConnection,
 	pub server_node: ServerNode,
+}
+
+impl ServerNodeController {
+	/// Create new
+	/// 
+	/// Fetch resources locally
+	pub async fn new() -> Result<Self, Box<dyn Error>> {
+		let db = mysql_connection().await?;
+		// On insert, id is ignored
+		let server_node = ServerNode::new(1)?;
+		
+		Ok(Self { db, server_node })
+	}
 }
 
 #[cfg(test)]
