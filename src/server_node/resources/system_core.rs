@@ -105,7 +105,7 @@ impl CpuCoreController {
 
     /// Update all cores
     ///
-    ///
+    /// FIXME: Doesn't work
     pub async fn update_all_cores(&self) -> Result<(), Box<dyn Error>> {
         // Cpus don't have identification
         // Find related cpus
