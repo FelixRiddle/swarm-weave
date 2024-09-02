@@ -22,7 +22,7 @@ pub fn get_computer_ip() -> Result<String, Box<dyn Error>> {
     Ok("0.0.0.0".to_string())
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct IpAddress {
     pub address: String,
     pub port: u16,
@@ -37,13 +37,13 @@ impl IpAddress {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub enum ServerLocation {
     IpAddress(IpAddress),
     DomainName(String),
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ServerInfo {
     // Display name
     pub name: String,

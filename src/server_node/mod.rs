@@ -1,6 +1,10 @@
-use sea_orm::DatabaseConnection;
+use sea_orm::{
+	DatabaseConnection,
+	EntityTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use entity::server_node::Entity as ServerNodeEntity;
 
 pub mod server_info;
 pub mod system_info;
@@ -13,7 +17,7 @@ pub use server_info::ServerInfo;
 
 use crate::database::mysql_connection;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[derive(Deserialize, Serialize)]
 pub enum ServerStatus {
     Online,
@@ -21,7 +25,7 @@ pub enum ServerStatus {
     Maintenance,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct ServerNode {
     pub id: u32,
     pub location: ServerInfo,
@@ -40,6 +44,19 @@ impl ServerNode {
             system_info: SystemInfo::new(),
         })
     }
+	
+	// /// Into active model
+	// /// 
+	// /// Convert this structure into a SeaORM active model
+	// pub fn into_active_model(self) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
+	// 	Ok(ServerNodeActiveModel {
+    //         id: self.id,
+    //         location: self.location.into(),
+    //         status: self.status.into(),
+    //         resources: self.resources.into(),
+    //         system_info: self.system_info.into(),
+    //     })
+	// }
 }
 
 /// Server node controller
@@ -61,6 +78,50 @@ impl ServerNodeController {
 		
 		Ok(Self { db, server_node })
 	}
+    
+    // /// Insert
+    // /// 
+    // /// 
+    // pub async fn insert(self) -> Result<Self, Box<dyn Error>> {
+    //     let insert_result = self.server_node.clone().into_active_model().insert(&self.db).await?;
+    //     assert_eq!(insert_result.rows_affected, 1);
+        
+    //     Ok(self)
+    // }
+    
+    // /// Update
+    // /// 
+    // /// 
+    // pub async fn update(self) -> Result<Self, Box<dyn Error>> {
+    //     let update_result = self.server_node.clone().into_active_model().update(&self.db).await?;
+    //     assert_eq!(update_result.rows_affected, 1);
+        
+    //     Ok(self)
+    // }
+    
+    // /// Find
+    // /// 
+    // /// 
+    // pub async fn find(self, id: u32) -> Result<Self, Box<dyn Error>> {
+    //     let found_server_node = ServerNodeEntity::find_by_id(id).one(&self.db).await?;
+    //     match found_server_node {
+    //         Some(server_node) => {
+    //             let server_node = server_node.try_into_model()?;
+    //             Ok(Self { db: self.db, server_node })
+    //         },
+    //         None => Err("Server node not found".into()),
+    //     }
+    // }
+    
+    /// Delete
+    /// 
+    /// 
+    pub async fn delete(self, id: u32) -> Result<Self, Box<dyn Error>> {
+        let delete_result = ServerNodeEntity::delete_by_id(id).exec(&self.db).await?;
+        assert_eq!(delete_result.rows_affected, 1);
+        
+        Ok(self)
+    }
 }
 
 #[cfg(test)]

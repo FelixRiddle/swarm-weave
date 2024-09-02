@@ -106,6 +106,8 @@ impl CpuCoreController {
     /// Update all cores
     ///
     /// FIXME: Doesn't work
+	/// 
+	/// TODO: While this doesn't wants to work, an alternative solution is to store them as json in a folder with the resources id as name
     pub async fn update_all_cores(&self) -> Result<(), Box<dyn Error>> {
         // Cpus don't have identification
         // Find related cpus
