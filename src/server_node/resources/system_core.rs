@@ -5,7 +5,7 @@ use entity::{
     system_resources::ActiveModel as SystemResourcesActiveModel,
 };
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait, Order, QueryFilter, TryIntoModel
+    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, TryIntoModel
 };
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -133,7 +133,13 @@ impl CpuCoreController {
 			// Sort by id and then get the difference as index smallest id
 			// From there onwards we can delete records from the database
 			cpus.sort_by_key(|cpu| cpu.id);
-			let diffth_smallest_id = cpus[diff as usize].id;
+			// let diffth_smallest_id = cpus[diff as usize].id;
+			let diffth_smallest_id = cpus[cpus.len() - diff as usize].id;
+			
+			println!("Smallest id: {}", diffth_smallest_id);
+			for (index, _cpu) in cpus.iter().enumerate() {
+				println!("Index: {}, Id: {}", index, _cpu.id);
+			}
 			
 			// Remove the last diff number of elements
 			SystemCoreEntity::delete_many()
