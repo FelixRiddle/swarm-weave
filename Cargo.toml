@@ -77,7 +77,7 @@ features = [
 path = "migration"
 
 [dependencies.sea-orm]
-version = "1.0.0"
+version = "1.0.1"
 features = [
     "sqlx-mysql",
     "runtime-tokio-native-tls",
