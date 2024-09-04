@@ -215,7 +215,7 @@ impl ServerInfoController {
     }
 
     pub async fn delete(self, id: i64) -> Result<Self, Box<dyn Error>> {
-        let delete_result = ServerLocationEntity::delete_by_id(id)
+        ServerLocationEntity::delete_by_id(id)
             .exec(&self.db)
             .await?;
 
