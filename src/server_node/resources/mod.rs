@@ -98,153 +98,6 @@ impl Resources {
 	pub fn total_cores(&self) -> u32 {
 		self.cpus.len() as u32
 	}
-	
-	/// Insert data
-	///
-	/// Returns system resources id
-	pub async fn insert_data(&self, db: &DatabaseConnection) -> Result<i64, Box<dyn Error>> {
-		// Create and insert resources
-		let local_system_resources_instance = SystemResources {
-			eval_time: ActiveValue::Set(self.eval_time.naive_utc()),
-			..Default::default() // all other attributes are `NotSet`
-		};
-		let inserted_system_resources = local_system_resources_instance.clone().insert(db).await?;
-
-		// Create system core instances
-		let system_core_controller = CpuCoreController::new(
-			db.clone(),
-			self.clone(),
-			inserted_system_resources.into_active_model(),
-		);
-		let system_core_instances = system_core_controller.create_cores()?;
-		for system_core_instance in system_core_instances {
-			system_core_instance.save(db).await?;
-		}
-
-		// Take the id
-		let system_resources_id = system_core_controller.id()?;
-
-		// System memory instance
-		let system_memory_instance = system_memory::ActiveModel {
-			total: ActiveValue::Set(i64::try_from(self.memory.total)?),
-			used: ActiveValue::Set(i64::try_from(self.memory.used)?),
-			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-			..Default::default()
-		};
-		system_memory_instance.save(db).await?;
-
-		// Insert storage data
-		for storage in &self.storage {
-			let storage_instance = StorageDevice {
-				name: ActiveValue::Set(storage.name.clone()),
-				total: ActiveValue::Set(i64::try_from(storage.total)?),
-				used: ActiveValue::Set(i64::try_from(storage.used)?),
-				system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-				is_removable: ActiveValue::Set(storage.is_removable as i8),
-				kind: ActiveValue::Set(serde_json::to_string(&storage.kind)?),
-				..Default::default()
-			};
-			storage_instance.save(db).await?;
-		}
-
-		Ok(system_resources_id)
-	}
-
-	/// Update
-	///
-	///
-	pub async fn update(
-		&self,
-		system_resources_id: i64,
-		db: &DatabaseConnection,
-	) -> Result<(), Box<dyn Error>> {
-		println!("Id: {}", system_resources_id);
-
-		// Create and insert resources
-		let system_resources_instance = SystemResources {
-			eval_time: ActiveValue::Set(self.eval_time.naive_utc()),
-			id: ActiveValue::Unchanged(system_resources_id),
-		};
-		
-		// Update system cores
-		let system_core_controller =
-			CpuCoreController::new(db.clone(), self.clone(), system_resources_instance.clone());
-		system_core_controller.update_all_cores().await?;
-		
-		println!("Updated system cores");
-		
-		// System resources id
-		let system_resources_id = system_core_controller.id()?;
-		
-		// System memory instance
-		let system_memory_instance = system_memory::ActiveModel {
-			total: ActiveValue::Set(i64::try_from(self.memory.total)?),
-			used: ActiveValue::Set(i64::try_from(self.memory.used)?),
-			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-			..Default::default()
-		};
-		system_memory_instance.save(db).await?;
-		
-		// Update storage
-		// We need to know how many storage devices do we have already
-		// We know storage devices name is unique
-		let system_resources_instance = system_resources_instance.try_into_model()?;
-		let existing_storage_devices = system_resources_instance
-			.find_related(StorageDeviceEntity)
-			.all(db)
-			.await?;
-
-		// Compare with our storage devices and remove from the database those that aren't in this structure
-		let removed_devices: Vec<&entity::storage_device::Model> = existing_storage_devices
-			.iter()
-			// Get missing storage devices to remove
-			.filter(|storage_device| {
-				let is_there = existing_storage_devices
-					.iter()
-					.filter(|existing_device| existing_device.id == storage_device.id)
-					.collect::<Vec<_>>();
-
-				if !is_there.is_empty() {
-					return true;
-				}
-
-				false
-			})
-			.collect::<Vec<_>>();
-
-		// Delete removed devices in parallel
-		let mut handles: Vec<tokio::task::JoinHandle<Result<(), anyhow::Error>>> = vec![];
-		for model in removed_devices {
-			let model: entity::storage_device::Model = model.clone();
-			let db = db.clone();
-
-			handles.push(tokio::spawn(async move {
-				model.delete(&db).await.map_err(|e| anyhow::Error::new(e))?;
-				Ok(())
-			}));
-		}
-
-		// Wait for deletions to complete
-		for handle in handles {
-			handle.await??;
-		}
-
-		// Insert storage data
-		for storage in &self.storage {
-			let storage_instance = StorageDevice {
-				name: ActiveValue::Set(storage.name.clone()),
-				total: ActiveValue::Set(i64::try_from(storage.total)?),
-				used: ActiveValue::Set(i64::try_from(storage.used)?),
-				system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-				is_removable: ActiveValue::Set(storage.is_removable as i8),
-				kind: ActiveValue::Set(serde_json::to_string(&storage.kind)?),
-				..Default::default()
-			};
-			storage_instance.save(db).await?;
-		}
-
-		Ok(())
-	}
 }
 
 pub struct SystemResourcesController {
@@ -252,6 +105,13 @@ pub struct SystemResourcesController {
 }
 
 impl SystemResourcesController {
+	/// Create new instance
+	/// 
+	/// 
+	pub fn new(resources: Resources) -> Self {
+		SystemResourcesController { resources }
+	}
+	
 	/// Insert data
 	///
 	/// Returns system resources id
@@ -438,7 +298,8 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Call the insert_data function
-		resources.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(resources);
+		system_resources_controller.insert_data(&db).await.unwrap();
 
 		// Verify that data was inserted correctly
 		let system_resources = SystemResources::find().all(&db).await.unwrap();
@@ -470,7 +331,8 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let resource_id = resources.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(resources);
+		let resource_id = system_resources_controller.insert_data(&db).await.unwrap();
 
 		// Update resources
 		let updated_resources = Resources {
@@ -501,8 +363,9 @@ mod tests {
 		let id: i64 = res_model.id;
 
 		// Call the update function
-		updated_resources.update(id, &db).await.unwrap();
-
+		let system_resources_controller = SystemResourcesController::new(updated_resources.clone());
+		system_resources_controller.update(id, &db).await.unwrap();
+		
 		// Verify that the data was updated correctly
 		let res_model = SystemResources::find_by_id(resource_id)
 			.one(&db)
@@ -545,7 +408,8 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let resource_id = resources.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(resources);
+		let resource_id = system_resources_controller.insert_data(&db).await.unwrap();
 
 		// Get the ID of the inserted system resources
 		let res_model = SystemResources::find_by_id(resource_id)
@@ -576,7 +440,8 @@ mod tests {
 		};
 
 		// Call the update function
-		updated_resources.update(id, &db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(updated_resources.clone());
+		system_resources_controller.update(id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
 		let res_model = SystemResources::find_by_id(resource_id)
@@ -632,7 +497,8 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let resource_id = resources.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(resources);
+		let resource_id = system_resources_controller.insert_data(&db).await.unwrap();
 
 		// Update resources
 		let updated_resources = Resources {
@@ -655,7 +521,8 @@ mod tests {
 		};
 
 		// Call the update function
-		updated_resources.update(resource_id, &db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(updated_resources.clone());
+		system_resources_controller.update(resource_id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
 		let res_model = SystemResources::find_by_id(resource_id)

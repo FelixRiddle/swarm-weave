@@ -23,6 +23,27 @@ pub struct CpuCore {
 	pub free_percentage: f64,
 }
 
+impl CpuCore {
+	/// Convert into active model
+	///
+	///
+	pub fn try_into_active_model(
+		&self,
+		cpu: &CpuCore,
+		system_resources_id: i64,
+	) -> Result<SystemCoreActiveModel, Box<dyn Error>> {
+		// Create system core
+		let system_core_instance = SystemCoreActiveModel {
+			usage_percentage: ActiveValue::Set(to_f32(cpu.usage_percentage)?),
+			free_percentage: ActiveValue::Set(to_f32(cpu.free_percentage)?),
+			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
+			..Default::default()
+		};
+
+		Ok(system_core_instance)
+	}
+}
+
 /// System core controller
 ///
 /// Because I'm tired of using references
@@ -387,12 +408,11 @@ pub mod tests {
 		system_core::Entity as SystemCoreEntity, system_resources::Entity as SystemResourcesEntity,
 	};
 	use sea_orm::{EntityTrait, ModelTrait};
-
+	
 	use super::CpuCore;
 	use crate::database::mysql_connection;
-	use crate::server_node::resources::to_f32;
 	use crate::server_node::{
-		resources::{Memory, Resources},
+		resources::{Memory, Resources, SystemResourcesController, to_f32},
 		storage::{DiskKind, Storage},
 	};
 
@@ -411,7 +431,8 @@ pub mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let resource_id: i64 = resources.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(resources);
+		let resource_id: i64 = system_resources_controller.insert_data(&db).await.unwrap();
 
 		// Update resources
 		let updated_resources = Resources {
@@ -434,7 +455,7 @@ pub mod tests {
 		};
 
 		// Call the update function
-		updated_resources.update(resource_id, &db).await.unwrap();
+		system_resources_controller.update(resource_id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
 		let res_model = SystemResourcesEntity::find_by_id(resource_id)
@@ -511,7 +532,8 @@ pub mod tests {
 		};
 
 		// Insert initial data
-		let resource_id: i64 = resources.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(resources);
+		let resource_id: i64 = system_resources_controller.insert_data(&db).await.unwrap();
 
 		// Update resources
 		let updated_resources = Resources {
@@ -549,7 +571,8 @@ pub mod tests {
 		};
 
 		// Call the update function
-		updated_resources.update(resource_id, &db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(updated_resources.clone());
+		system_resources_controller.update(resource_id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
 		let res_model = SystemResourcesEntity::find_by_id(resource_id)
@@ -602,10 +625,11 @@ pub mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let resource_id: i64 = resources.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(resources);
+		let resource_id: i64 = system_resources_controller.insert_data(&db).await.unwrap();
 
 		// Create system cores based on the updated resources
-		let mut system_cores = resources.cpus.clone();
+		let mut system_cores = system_resources_controller.resources.cpus.clone();
 
 		// Update resources
 		let new_cores = vec![
@@ -657,7 +681,8 @@ pub mod tests {
 		};
 
 		// Call the update function
-		updated_resources.update(resource_id, &db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(updated_resources.clone());
+		system_resources_controller.update(resource_id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
 		let res_model = SystemResourcesEntity::find_by_id(resource_id)

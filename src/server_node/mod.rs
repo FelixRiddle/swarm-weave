@@ -1,10 +1,14 @@
 use sea_orm::{
+	ActiveValue,
 	DatabaseConnection,
 	EntityTrait,
 };
 use serde::{Deserialize, Serialize};
 use std::error::Error;
-use entity::server_node::Entity as ServerNodeEntity;
+use entity::server_node::{
+	Entity as ServerNodeEntity,
+	ActiveModel as ServerNodeActiveModel,
+};
 
 pub mod server_info;
 pub mod system_info;
@@ -45,18 +49,23 @@ impl ServerNode {
         })
     }
 	
-	// /// Into active model
+	// /// Try into active model
 	// /// 
-	// /// Convert this structure into a SeaORM active model
-	// pub fn into_active_model(self) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
-	// 	Ok(ServerNodeActiveModel {
-    //         id: self.id,
-    //         location: self.location.into(),
-    //         status: self.status.into(),
-    //         resources: self.resources.into(),
-    //         system_info: self.system_info.into(),
+	// /// 
+    // pub fn try_into_active_model(self) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
+    //     Ok(ServerNodeActiveModel {
+    //         id: ActiveValue::Set(self.id as i32),
+    //         location: ActiveValue::Set(self.location.into_active_model()),
+    //         status: ActiveValue::Set(match self.status {
+    //             ServerStatus::Online => "Online",
+    //             ServerStatus::Offline => "Offline",
+    //             ServerStatus::Maintenance => "Maintenance",
+    //         }),
+    //         resources: ActiveValue::Set(self.resources.into_active_model()),
+    //         system_info: ActiveValue::Set(self.system_info.into_active_model()),
+	// 		..Default::default()
     //     })
-	// }
+    // }
 }
 
 /// Server node controller
