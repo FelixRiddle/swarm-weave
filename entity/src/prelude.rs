@@ -42,6 +42,7 @@ pub use super::property_seller_message::Entity as PropertySellerMessage;
 pub use super::sequelize_meta::Entity as SequelizeMeta;
 pub use super::server_location::Entity as ServerLocation;
 pub use super::server_node::Entity as ServerNode;
+pub use super::service::Entity as Service;
 pub use super::services::Entity as Services;
 pub use super::session::Entity as Session;
 pub use super::sessions::Entity as Sessions;

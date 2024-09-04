@@ -3,24 +3,19 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "contact-form")]
+#[sea_orm(table_name = "service")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
     pub name: String,
-    pub email: Option<String>,
-    #[sea_orm(column_name = "phoneNumber")]
-    pub phone_number: Option<String>,
     #[sea_orm(column_type = "Text")]
-    pub message: String,
+    pub description: String,
+    #[sea_orm(column_type = "Decimal(Some((10, 2)))")]
+    pub price: Decimal,
     #[sea_orm(column_name = "createdAt")]
     pub created_at: Option<DateTime>,
     #[sea_orm(column_name = "updatedAt")]
     pub updated_at: Option<DateTime>,
-    #[sea_orm(column_name = "fromWebsite")]
-    pub from_website: Option<String>,
-    #[sea_orm(column_name = "fromApp")]
-    pub from_app: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

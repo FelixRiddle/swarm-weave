@@ -184,16 +184,6 @@ impl ServerInfoController {
         Ok(result)
     }
 
-    // pub async fn update(self) -> Result<Self, Box<dyn Error>> {
-    //     self.server_info
-    //         .clone()
-    //         .into_active_model()
-    //         .update(&self.db)
-    //         .await?;
-
-    //     Ok(self)
-    // }
-	
 	pub async fn update(self) -> Result<Self, Box<dyn Error>> {
 		let updated_active_model = self.server_info
 			.clone()
@@ -228,7 +218,6 @@ impl ServerInfoController {
         let delete_result = ServerLocationEntity::delete_by_id(id)
             .exec(&self.db)
             .await?;
-        assert_eq!(delete_result.rows_affected, 1);
 
         Ok(self)
     }

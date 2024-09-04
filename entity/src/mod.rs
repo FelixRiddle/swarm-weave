@@ -45,6 +45,7 @@ pub mod sea_orm_active_enums;
 pub mod sequelize_meta;
 pub mod server_location;
 pub mod server_node;
+pub mod service;
 pub mod services;
 pub mod session;
 pub mod sessions;
