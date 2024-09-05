@@ -155,28 +155,20 @@ impl SystemResourcesController {
 		for system_core_instance in system_core_instances {
 			system_core_instance.save(db).await?;
 		}
-
+		
 		// Take the id
 		let system_resources_id = system_core_controller.id()?;
-
+		
 		// System memory instance
 		let system_memory_instance = self.resources.memory.try_into_active_model(system_resources_id)?;
 		system_memory_instance.save(db).await?;
-
+		
 		// Insert storage data
 		for storage in &self.resources.storage {
-			let storage_instance = StorageDevice {
-				name: ActiveValue::Set(storage.name.clone()),
-				total: ActiveValue::Set(i64::try_from(storage.total)?),
-				used: ActiveValue::Set(i64::try_from(storage.used)?),
-				system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-				is_removable: ActiveValue::Set(storage.is_removable as i8),
-				kind: ActiveValue::Set(serde_json::to_string(&storage.kind)?),
-				..Default::default()
-			};
+			let storage_instance = storage.try_into_active_model(system_resources_id)?;
 			storage_instance.save(db).await?;
 		}
-
+		
 		Ok(system_resources_id)
 	}
 
