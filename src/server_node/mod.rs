@@ -61,19 +61,24 @@ impl ServerNode {
         })
     }
 	
-	// /// Try into active model
-	// /// 
-	// /// 
-    // pub fn try_into_active_model(self) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
-    //     Ok(ServerNodeActiveModel {
-    //         id: ActiveValue::Set(i64::try_from(self.id)?),
-    //         location: ActiveValue::Set(self.location.into_active_model()),
-    //         status: ActiveValue::Set(Some(self.status.into())),
-    //         resources: ActiveValue::Set(self.resources.into_active_model()),
-    //         system_info: ActiveValue::Set(self.system_info.into_active_model()),
-	// 		..Default::default()
-    //     })
-    // }
+	/// Try into active model
+	/// 
+	/// 
+    pub fn try_into_active_model(
+		self,
+		server_location_id: i64,
+		resource_id: i64,
+		system_info_id: i64
+	) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
+        Ok(ServerNodeActiveModel {
+            id: ActiveValue::Set(i64::try_from(self.id)?),
+            status: ActiveValue::Set(Some(self.status.into())),
+			server_location_id: ActiveValue::Set(Some(server_location_id)),
+			system_resource_id: ActiveValue::Set(Some(resource_id)),
+            system_info_id: ActiveValue::Set(Some(system_info_id)),
+			..Default::default()
+        })
+    }
 }
 
 /// Server node controller
