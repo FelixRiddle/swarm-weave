@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
 use entity::{
 	storage_device::{ActiveModel as StorageDevice, Entity as StorageDeviceEntity},
-	system_memory,
-	system_resources::ActiveModel as SystemResources,
+	system_memory::ActiveModel as SystemMemoryActiveModel,
+	system_resources::ActiveModel as SystemResourcesActiveModel,
 };
 use sea_orm::{
 	ActiveModelTrait, ActiveValue, DatabaseConnection, IntoActiveModel, ModelTrait, TryIntoModel,
@@ -35,6 +35,22 @@ pub fn to_f32(x: f64) -> Result<f32, Box<dyn Error>> {
 pub struct Memory {
 	pub total: u64,
 	pub used: u64,
+}
+
+impl Memory {
+	/// Try into active model
+	/// 
+	/// 
+	pub fn try_into_active_model(&self, system_resources_id: i64) -> Result<SystemMemoryActiveModel, Box<dyn Error>> {
+		let system_mem = SystemMemoryActiveModel {
+			total: ActiveValue::Set(i64::try_from(self.total)?),
+			used: ActiveValue::Set(i64::try_from(self.used)?),
+			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
+			..Default::default()
+		};
+		
+		Ok(system_mem)
+	}
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -98,6 +114,15 @@ impl Resources {
 	pub fn total_cores(&self) -> u32 {
 		self.cpus.len() as u32
 	}
+	
+	pub fn into_active_model(&self) -> SystemResourcesActiveModel {
+		let system_resources = SystemResourcesActiveModel {
+			eval_time: ActiveValue::Set(self.eval_time.naive_utc()),
+			..Default::default()
+		};
+		
+		system_resources
+	}
 }
 
 pub struct SystemResourcesController {
@@ -117,10 +142,7 @@ impl SystemResourcesController {
 	/// Returns system resources id
 	pub async fn insert_data(&self, db: &DatabaseConnection) -> Result<i64, Box<dyn Error>> {
 		// Create and insert resources
-		let local_system_resources_instance = SystemResources {
-			eval_time: ActiveValue::Set(self.resources.eval_time.naive_utc()),
-			..Default::default() // all other attributes are `NotSet`
-		};
+		let local_system_resources_instance = self.resources.into_active_model();
 		let inserted_system_resources = local_system_resources_instance.clone().insert(db).await?;
 		
 		// Create system core instances
@@ -138,12 +160,7 @@ impl SystemResourcesController {
 		let system_resources_id = system_core_controller.id()?;
 
 		// System memory instance
-		let system_memory_instance = system_memory::ActiveModel {
-			total: ActiveValue::Set(i64::try_from(self.resources.memory.total)?),
-			used: ActiveValue::Set(i64::try_from(self.resources.memory.used)?),
-			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-			..Default::default()
-		};
+		let system_memory_instance = self.resources.memory.try_into_active_model(system_resources_id)?;
 		system_memory_instance.save(db).await?;
 
 		// Insert storage data
@@ -172,9 +189,9 @@ impl SystemResourcesController {
 		db: &DatabaseConnection,
 	) -> Result<(), Box<dyn Error>> {
 		println!("Id: {}", system_resources_id);
-
+		
 		// Create and insert resources
-		let system_resources_instance = SystemResources {
+		let system_resources_instance = SystemResourcesActiveModel {
 			eval_time: ActiveValue::Set(self.resources.eval_time.naive_utc()),
 			id: ActiveValue::Unchanged(system_resources_id),
 		};
@@ -190,12 +207,7 @@ impl SystemResourcesController {
 		let system_resources_id = system_core_controller.id()?;
 		
 		// System memory instance
-		let system_memory_instance = system_memory::ActiveModel {
-			total: ActiveValue::Set(i64::try_from(self.resources.memory.total)?),
-			used: ActiveValue::Set(i64::try_from(self.resources.memory.used)?),
-			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-			..Default::default()
-		};
+		let system_memory_instance = self.resources.memory.try_into_active_model(system_resources_id)?;
 		system_memory_instance.save(db).await?;
 		
 		// Update storage
@@ -264,7 +276,7 @@ impl SystemResourcesController {
 mod tests {
 	use entity::{
 		storage_device::Entity as StorageDevice, system_core::Entity as SystemCore,
-		system_memory::Entity as SystemMemory, system_resources::Entity as SystemResources,
+		system_memory::Entity as SystemMemoryEntity, system_resources::Entity as SystemResources,
 	};
 	use sea_orm::{EntityTrait, ModelTrait};
 
@@ -310,7 +322,7 @@ mod tests {
 
 		assert!(!system_cores.is_empty());
 
-		let system_memory = system_memory::Entity::find().all(&db).await.unwrap();
+		let system_memory = SystemMemoryEntity::find().all(&db).await.unwrap();
 
 		assert!(!system_memory.is_empty());
 
@@ -380,7 +392,7 @@ mod tests {
 
 		// Get system memory
 		let updated_system_memory = res_model
-			.find_related(SystemMemory)
+			.find_related(SystemMemoryEntity)
 			.one(&db)
 			.await
 			.unwrap()
@@ -549,7 +561,7 @@ mod tests {
 
 		// Get system memory
 		let updated_system_memory = res_model
-			.find_related(SystemMemory)
+			.find_related(SystemMemoryEntity)
 			.one(&db)
 			.await
 			.unwrap()

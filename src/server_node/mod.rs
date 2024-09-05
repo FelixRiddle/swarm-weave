@@ -9,6 +9,7 @@ use entity::server_node::{
 	Entity as ServerNodeEntity,
 	ActiveModel as ServerNodeActiveModel,
 };
+use strum_macros::Display;
 
 pub mod server_info;
 pub mod system_info;
@@ -21,7 +22,7 @@ pub use server_info::ServerInfo;
 
 use crate::database::mysql_connection;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Display, PartialEq)]
 #[derive(Deserialize, Serialize)]
 pub enum ServerStatus {
     Online,
@@ -145,4 +146,27 @@ mod tests {
         assert_eq!(server_node.status, ServerStatus::Online);
         assert!(server_node.system_info.name.len() > 0);
     }
+	
+	/// Test serialization
+	/// 
+	/// 
+	#[test]
+	fn test_server_status_serialization() {
+		let status = ServerStatus::Online;
+		let serialized_status = serde_json::to_string(&status).unwrap();
+		
+		// It looks like this, not what I expected
+		assert_eq!("\"Online\"", serialized_status);
+	}
+	
+	/// Test to string
+	/// 
+	/// 
+	#[test]
+	fn test_server_status_to_string() {
+		let status = ServerStatus::Online;
+		let serialized_status = status.to_string();
+		
+		assert_eq!("Online", serialized_status);
+	}
 }

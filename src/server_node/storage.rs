@@ -1,7 +1,9 @@
+use entity::storage_device::ActiveModel as StorageDeviceActiveModel;
 use serde::{Deserialize, Serialize};
 use sysinfo::{
     Disk, DiskKind as SysDiskKind,
 };
+use sea_orm::ActiveValue;
 
 /// Disk kind
 /// 
@@ -50,6 +52,18 @@ impl Storage {
     pub fn available_space(&self) -> u64 {
         self.total - self.used
     }
+	
+	pub fn try_into_active_model(&self, system_resources_id: i64) -> Result<StorageDeviceActiveModel, Box<dyn std::error::Error>> {
+		Ok(StorageDeviceActiveModel {
+			name: ActiveValue::Set(self.name.clone()),
+			total: ActiveValue::Set(i64::try_from(self.total)?),
+			used: ActiveValue::Set(i64::try_from(self.used)?),
+			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
+			is_removable: ActiveValue::Set(self.is_removable as i8),
+			kind: ActiveValue::Set(serde_json::to_string(&self.kind)?),
+			..Default::default()
+		})
+	}
 }
 
 #[cfg(test)]
