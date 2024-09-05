@@ -9,6 +9,7 @@ use entity::server_node::{
 	Entity as ServerNodeEntity,
 	ActiveModel as ServerNodeActiveModel,
 };
+use entity::sea_orm_active_enums::Status;
 use strum_macros::Display;
 
 pub mod server_info;
@@ -28,6 +29,16 @@ pub enum ServerStatus {
     Online,
     Offline,
     Maintenance,
+}
+
+impl From<ServerStatus> for Status {
+    fn from(status: ServerStatus) -> Self {
+        match status {
+            ServerStatus::Online => Status::Online,
+            ServerStatus::Offline => Status::Offline,
+            ServerStatus::Maintenance => Status::Maintenance,
+        }
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -55,13 +66,9 @@ impl ServerNode {
 	// /// 
     // pub fn try_into_active_model(self) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
     //     Ok(ServerNodeActiveModel {
-    //         id: ActiveValue::Set(self.id as i32),
+    //         id: ActiveValue::Set(i64::try_from(self.id)?),
     //         location: ActiveValue::Set(self.location.into_active_model()),
-    //         status: ActiveValue::Set(match self.status {
-    //             ServerStatus::Online => "Online",
-    //             ServerStatus::Offline => "Offline",
-    //             ServerStatus::Maintenance => "Maintenance",
-    //         }),
+    //         status: ActiveValue::Set(Some(self.status.into())),
     //         resources: ActiveValue::Set(self.resources.into_active_model()),
     //         system_info: ActiveValue::Set(self.system_info.into_active_model()),
 	// 		..Default::default()
