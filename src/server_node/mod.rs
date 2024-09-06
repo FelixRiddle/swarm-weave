@@ -9,7 +9,12 @@ use entity::server_node::{
 	Entity as ServerNodeEntity,
 	ActiveModel as ServerNodeActiveModel,
 };
-use entity::sea_orm_active_enums::Status;
+use entity::{
+	sea_orm_active_enums::Status,
+	server_location::ActiveModel as ServerLocationActiveModel,
+	system_resources::ActiveModel as SystemResourcesActiveModel,
+	system_info::ActiveModel as SystemInfoActiveModel,
+};
 use strum_macros::Display;
 
 pub mod server_info;
@@ -20,8 +25,6 @@ pub mod storage;
 pub use resources::Resources;
 pub use system_info::SystemInfo;
 pub use server_info::ServerInfo;
-
-use crate::database::mysql_connection;
 
 #[derive(Clone, Debug, Display, PartialEq)]
 #[derive(Deserialize, Serialize)]
@@ -87,29 +90,84 @@ impl ServerNode {
 pub struct ServerNodeController {
 	pub db: DatabaseConnection,
 	pub server_node: ServerNode,
+	server_node_active_model: Option<ServerNodeActiveModel>,
+	// Models
+	pub server_location: ServerLocationActiveModel,
+	pub system_resources: SystemResourcesActiveModel,
+	pub system_info: SystemInfoActiveModel,
 }
 
 impl ServerNodeController {
 	/// Create new
 	/// 
-	/// Fetch resources locally
-	pub async fn new() -> Result<Self, Box<dyn Error>> {
-		let db = mysql_connection().await?;
-		// On insert, id is ignored
+	/// Fetch resources on creation
+	pub async fn new(
+		db: DatabaseConnection,
+		server_node_active_model: Option<ServerNodeActiveModel>,
+		server_location: ServerLocationActiveModel,
+		system_resources: SystemResourcesActiveModel,
+		system_info: SystemInfoActiveModel
+	) -> Result<Self, Box<dyn Error>> {
 		let server_node = ServerNode::new(1)?;
 		
-		Ok(Self { db, server_node })
+		Ok(Self {
+			db,
+			server_node,
+			server_node_active_model,
+			server_location,
+			system_resources,
+			system_info
+		})
+	}
+	
+	// /// Create new from server node id
+	// /// 
+	// /// TODO: This
+	// pub async fn new_from_server_node(id: u64) -> Result<Self, Box<dyn Error>> {
+		
+	// }
+	
+	/// Get or create server node active model
+	/// 
+	/// On creation the server node will be inserted, to make things faster
+	pub async fn get_server_node_active_model(&mut self) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
+		let model = match &self.server_node_active_model {
+			Some(model) => model.clone(),
+            None => {
+                let server_location_id = match self.server_location.id.clone().take() {
+					Some(id) => id,
+                    None => return Err("Server location id is not provided".into()),
+				};
+                let system_resource_id = match self.system_resources.id.clone().take() {
+					Some(id) => id,
+                    None => return Err("System resource id is not provided".into()),
+				};
+                let system_info_id = match self.system_info.id.clone().take() {
+					Some(id) => id,
+                    None => return Err("System info id is not provided".into()),
+				};
+                let model = self.server_node.clone().try_into_active_model(
+                    server_location_id,
+                    system_resource_id,
+                    system_info_id
+                )?;
+				
+                self.server_node_active_model = Some(model.clone());
+				
+                model
+            }
+		};
+		
+		Ok(model)
 	}
     
-    // /// Insert
-    // /// 
-    // /// 
-    // pub async fn insert(self) -> Result<Self, Box<dyn Error>> {
-    //     let insert_result = self.server_node.clone().into_active_model().insert(&self.db).await?;
-    //     assert_eq!(insert_result.rows_affected, 1);
-        
-    //     Ok(self)
-    // }
+    /// Insert
+    /// 
+    /// 
+    pub async fn insert(&mut self) -> Result<&mut Self, Box<dyn Error>> {
+		self.get_server_node_active_model().await?;
+        Ok(self)
+    }
     
     // /// Update
     // /// 
@@ -138,11 +196,19 @@ impl ServerNodeController {
     /// Delete
     /// 
     /// 
-    pub async fn delete(self, id: u32) -> Result<Self, Box<dyn Error>> {
-        let delete_result = ServerNodeEntity::delete_by_id(id).exec(&self.db).await?;
-        assert_eq!(delete_result.rows_affected, 1);
+    pub async fn delete(self) -> Result<Self, Box<dyn Error>> {
+        ServerNodeEntity::delete_by_id(self.server_node.id).exec(&self.db).await?;
         
         Ok(self)
+    }
+	
+    /// Delete by id
+    /// 
+    /// 
+    pub async fn delete_by_id(db: &DatabaseConnection, id: u32) -> Result<(), Box<dyn Error>> {
+        ServerNodeEntity::delete_by_id(id).exec(db).await?;
+        
+        Ok(())
     }
 }
 
