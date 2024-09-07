@@ -174,7 +174,6 @@ impl ServerNodeController {
     // /// 
     // pub async fn update(self) -> Result<Self, Box<dyn Error>> {
     //     let update_result = self.server_node.clone().into_active_model().update(&self.db).await?;
-    //     assert_eq!(update_result.rows_affected, 1);
         
     //     Ok(self)
     // }
@@ -196,8 +195,13 @@ impl ServerNodeController {
     /// Delete
     /// 
     /// 
-    pub async fn delete(self) -> Result<Self, Box<dyn Error>> {
-        ServerNodeEntity::delete_by_id(self.server_node.id).exec(&self.db).await?;
+    pub async fn delete(&mut self) -> Result<&mut Self, Box<dyn Error>> {
+		let server_node_active_model = self.get_server_node_active_model().await?;
+		let id = match server_node_active_model.id.try_as_ref() {
+			Some(id) => id,
+			None => return Err("Server node id doesn't exists".into()),
+		};
+        ServerNodeEntity::delete_by_id(id.clone()).exec(&self.db).await?;
         
         Ok(self)
     }
