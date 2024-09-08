@@ -431,8 +431,8 @@ pub mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(resources);
-		let resource_id: i64 = system_resources_controller.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let resource_id: i64 = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
 		let updated_resources = Resources {
@@ -532,8 +532,8 @@ pub mod tests {
 		};
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(resources);
-		let resource_id: i64 = system_resources_controller.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let resource_id: i64 = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
 		let updated_resources = Resources {
@@ -571,7 +571,7 @@ pub mod tests {
 		};
 
 		// Call the update function
-		let system_resources_controller = SystemResourcesController::new(updated_resources.clone());
+		let system_resources_controller = SystemResourcesController::new(db.clone(), updated_resources.clone());
 		system_resources_controller.update(resource_id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
@@ -625,8 +625,8 @@ pub mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(resources);
-		let resource_id: i64 = system_resources_controller.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let resource_id: i64 = system_resources_controller.insert_data().await.unwrap();
 
 		// Create system cores based on the updated resources
 		let mut system_cores = system_resources_controller.resources.cpus.clone();
@@ -681,7 +681,7 @@ pub mod tests {
 		};
 
 		// Call the update function
-		let system_resources_controller = SystemResourcesController::new(updated_resources.clone());
+		let system_resources_controller = SystemResourcesController::new(db.clone(), updated_resources.clone());
 		system_resources_controller.update(resource_id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly

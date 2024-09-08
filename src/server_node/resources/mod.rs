@@ -1,11 +1,16 @@
 use chrono::{DateTime, Utc};
 use entity::{
+	server_node::Model as ServerNodeModel,
 	storage_device::{ActiveModel as StorageDevice, Entity as StorageDeviceEntity},
 	system_memory::ActiveModel as SystemMemoryActiveModel,
-	system_resources::ActiveModel as SystemResourcesActiveModel,
+	system_resources::{
+		ActiveModel as SystemResourcesActiveModel,
+		Entity as SystemResourcesEntity,
+		Model as SystemResourcesModel,
+	},
 };
 use sea_orm::{
-	ActiveModelTrait, ActiveValue, DatabaseConnection, IntoActiveModel, ModelTrait, TryIntoModel,
+	ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait, TryIntoModel
 };
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -114,7 +119,15 @@ impl Resources {
 	pub fn total_cores(&self) -> u32 {
 		self.cpus.len() as u32
 	}
-	
+}
+
+/// Conversions
+/// 
+/// 
+impl Resources {
+	/// Convert resources into active model
+	/// 
+	/// 
 	pub fn into_active_model(&self) -> SystemResourcesActiveModel {
 		let system_resources = SystemResourcesActiveModel {
 			eval_time: ActiveValue::Set(self.eval_time.naive_utc()),
@@ -123,37 +136,76 @@ impl Resources {
 		
 		system_resources
 	}
+	
+	// /// Create from model
+	// /// 
+	// /// 
+	// pub fn from_model(model: SystemResourcesModel) -> Option<Self> {
+	// 	let model = model.into_active_model();
+	// 	let model = Self::from_active_model(model);
+		
+	// 	model
+	// }
+	
+	// /// Create from active model
+	// /// 
+	// /// 
+	// pub fn from_active_model(active_model: SystemResourcesActiveModel) -> Option<Self> {
+	// 	let eval_time = active_model.eval_time.clone().into();
+	// 	let cpus = vec![]; // You need to implement logic to fetch CPUs from the database
+	// 	let memory = Memory {
+	// 		total: active_model.memory.total.into(),
+	// 		used: active_model.memory.used.into(),
+	// 	};
+	// 	let storage = vec![]; // You need to implement logic to fetch storage from the database
+	
+	// 	Some(Resources {
+	// 		cpus,
+	// 		memory,
+	// 		storage,
+	// 		eval_time,
+	// 	})
+	// }
 }
 
 pub struct SystemResourcesController {
+	pub db: DatabaseConnection,
 	pub resources: Resources,
+	pub system_resources_active_model: Option<SystemResourcesActiveModel>,
 }
 
 impl SystemResourcesController {
 	/// Create new instance
 	/// 
 	/// 
-	pub fn new(resources: Resources) -> Self {
-		SystemResourcesController { resources }
+	pub fn new(
+		db: DatabaseConnection,
+		resources: Resources
+	) -> Self {
+		SystemResourcesController {
+			db,
+			resources,
+			system_resources_active_model: None,
+		}
 	}
 	
 	/// Insert data
 	///
 	/// Returns system resources id
-	pub async fn insert_data(&self, db: &DatabaseConnection) -> Result<i64, Box<dyn Error>> {
+	pub async fn insert_data(&self) -> Result<i64, Box<dyn Error>> {
 		// Create and insert resources
 		let local_system_resources_instance = self.resources.into_active_model();
-		let inserted_system_resources = local_system_resources_instance.clone().insert(db).await?;
+		let inserted_system_resources = local_system_resources_instance.clone().insert(&self.db).await?;
 		
 		// Create system core instances
 		let system_core_controller = CpuCoreController::new(
-			db.clone(),
+			self.db.clone(),
 			self.resources.clone(),
 			inserted_system_resources.into_active_model(),
 		);
 		let system_core_instances = system_core_controller.create_cores()?;
 		for system_core_instance in system_core_instances {
-			system_core_instance.save(db).await?;
+			system_core_instance.save(&self.db).await?;
 		}
 		
 		// Take the id
@@ -161,17 +213,17 @@ impl SystemResourcesController {
 		
 		// System memory instance
 		let system_memory_instance = self.resources.memory.try_into_active_model(system_resources_id)?;
-		system_memory_instance.save(db).await?;
+		system_memory_instance.save(&self.db).await?;
 		
 		// Insert storage data
 		for storage in &self.resources.storage {
 			let storage_instance = storage.try_into_active_model(system_resources_id)?;
-			storage_instance.save(db).await?;
+			storage_instance.save(&self.db).await?;
 		}
 		
 		Ok(system_resources_id)
 	}
-
+	
 	/// Update
 	///
 	///
@@ -262,6 +314,25 @@ impl SystemResourcesController {
 
 		Ok(())
 	}
+	
+	/// Find by server node model
+	/// 
+	/// 
+	pub async fn find_by_server_node_model(
+		db: DatabaseConnection,
+		server_node_active_model: ServerNodeModel
+    ) -> Result<SystemResourcesModel, Box<dyn Error>> {
+		let server_location_id = match server_node_active_model.server_location_id {
+			Some(id) => id,
+			None => return Err("Server location id not found".into()),
+		};
+		let server_location = match SystemResourcesEntity::find_by_id(server_location_id).one(&db).await? {
+			Some(model) => model,
+			None => return Err("Server location not found".into()),
+		};
+		
+		Ok(server_location)
+	}
 }
 
 #[cfg(test)]
@@ -302,8 +373,11 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Call the insert_data function
-		let system_resources_controller = SystemResourcesController::new(resources);
-		system_resources_controller.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(
+			db.clone(),
+			resources
+		);
+		system_resources_controller.insert_data().await.unwrap();
 
 		// Verify that data was inserted correctly
 		let system_resources = SystemResources::find().all(&db).await.unwrap();
@@ -335,8 +409,11 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(resources);
-		let resource_id = system_resources_controller.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(
+			db.clone(),
+			resources
+		);
+		let resource_id = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
 		let updated_resources = Resources {
@@ -367,7 +444,10 @@ mod tests {
 		let id: i64 = res_model.id;
 
 		// Call the update function
-		let system_resources_controller = SystemResourcesController::new(updated_resources.clone());
+		let system_resources_controller = SystemResourcesController::new(
+			db.clone(),
+			updated_resources.clone()
+		);
 		system_resources_controller.update(id, &db).await.unwrap();
 		
 		// Verify that the data was updated correctly
@@ -412,8 +492,11 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(resources);
-		let resource_id = system_resources_controller.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(
+			db.clone(),
+			resources
+		);
+		let resource_id = system_resources_controller.insert_data().await.unwrap();
 
 		// Get the ID of the inserted system resources
 		let res_model = SystemResources::find_by_id(resource_id)
@@ -444,7 +527,10 @@ mod tests {
 		};
 
 		// Call the update function
-		let system_resources_controller = SystemResourcesController::new(updated_resources.clone());
+		let system_resources_controller = SystemResourcesController::new(
+			db.clone(),
+			updated_resources.clone()
+		);
 		system_resources_controller.update(id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
@@ -501,8 +587,11 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(resources);
-		let resource_id = system_resources_controller.insert_data(&db).await.unwrap();
+		let system_resources_controller = SystemResourcesController::new(
+			db.clone(),
+			resources
+		);
+		let resource_id = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
 		let updated_resources = Resources {
@@ -523,9 +612,12 @@ mod tests {
 			}],
 			eval_time: Utc::now(),
 		};
-
+		
 		// Call the update function
-		let system_resources_controller = SystemResourcesController::new(updated_resources.clone());
+		let system_resources_controller = SystemResourcesController::new(
+			db.clone(),
+			updated_resources.clone()
+		);
 		system_resources_controller.update(resource_id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly

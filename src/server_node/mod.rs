@@ -18,7 +18,10 @@ pub mod server_info;
 pub mod storage;
 pub mod system_info;
 
-pub use resources::Resources;
+pub use resources::{
+	Resources,
+	SystemResourcesController,
+};
 pub use server_info::{
 	ServerInfo,
 	ServerInfoController,
@@ -136,7 +139,13 @@ impl ServerNodeController {
 	// 				None => return Err("Couldn't convert server location model to server info".into()),
 	// 			};
 				
-	// 			// TODO: Find system resources
+	// 			// Find system resources
+	// 			let system_resources_model = SystemResourcesController::find_by_server_node_model(db.clone(), server_node_active_model)
+	// 				.await?;
+	// 			let system_resources = match Resources::from_model(system_resources_model.clone()) {
+	// 				Some(system_resources) => system_resources,
+	// 				None => return Err("Couldn't convert system resources model to system resources".into())
+	// 			};
 				
 	// 			// Find system info
 	// 			let system_info_model = SystemInfoController::find_by_server_node_model(db.clone(), server_node_active_model)
