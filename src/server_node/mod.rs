@@ -23,7 +23,10 @@ pub use server_info::{
 	ServerInfo,
 	ServerInfoController,
 };
-pub use system_info::SystemInfo;
+pub use system_info::{
+	SystemInfo,
+	SystemInfoController,
+};
 
 #[derive(Clone, Debug, Display, PartialEq, Deserialize, Serialize)]
 pub enum ServerStatus {
@@ -118,7 +121,7 @@ impl ServerNodeController {
 		})
 	}
 
-	// /// Create new from server node id
+	// /// TODO: Create new from server node id
 	// /// 
 	// /// 
 	// pub async fn new_from_server_node(db: DatabaseConnection, id: u32) -> Result<Self, Box<dyn Error>> {
@@ -133,20 +136,32 @@ impl ServerNodeController {
 	// 				None => return Err("Couldn't convert server location model to server info".into()),
 	// 			};
 				
+	// 			// TODO: Find system resources
+				
+	// 			// Find system info
+	// 			let system_info_model = SystemInfoController::find_by_server_node_model(db.clone(), server_node_active_model)
+	// 				.await?;
+	// 			let system_info = match SystemInfo::from_model(system_info_model.clone()) {
+	// 				Some(system_info) => system_info,
+    //                 None => return Err("Couldn't convert system info model to system info".into()),
+	// 			};
+				
+	// 			// TODO: Create server node
 	// 			let server_node = ServerNode {
 	// 				id: server_node_active_model.id.try_into()?,
 	// 				location: server_location,
 	// 				status: server_node_active_model.status.into(),
 	// 				resources: Resources::from_active_model(system_resources.ok_or("System resources not found")?)?,
-	// 				system_info: SystemInfo::from_active_model(system_info.ok_or("System info not found")?)?,
+	// 				system_info,
 	// 			};
+				
 	// 			Ok(Self {
 	// 				db,
 	// 				server_node,
 	// 				server_node_active_model: Some(server_node_active_model),
 	// 				server_location: server_location_model.into_active_model(),
 	// 				system_resources: system_resources.ok_or("System resources not found")?,
-	// 				system_info: system_info.ok_or("System info not found")?,
+	// 				system_info: system_info.into_active_model(),
 	// 			})
 	// 		},
 	// 		None => Err("Server node not found".into()),
