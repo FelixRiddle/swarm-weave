@@ -41,7 +41,7 @@ impl CpuCore {
 			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
 			..Default::default()
 		};
-
+		
 		Ok(system_core_instance)
 	}
 }
@@ -301,7 +301,12 @@ pub mod tests {
 	use super::CpuCore;
 	use crate::database::mysql_connection;
 	use crate::server_node::{
-		resources::{Memory, Resources, SystemResourcesController, to_f32},
+		resources::{
+			Resources,
+			SystemResourcesController,
+			to_f32,
+			system_memory::Memory,
+		},
 		storage::{DiskKind, Storage},
 	};
 

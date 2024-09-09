@@ -27,11 +27,13 @@ use std::error::Error;
 use sysinfo::{Disks, System};
 
 pub mod system_core;
+pub mod system_memory;
 
 use crate::model::FromActiveModel;
 
 use super::storage::Storage;
 use system_core::{CpuCore as Cpu, CpuCoreController};
+use system_memory::Memory;
 
 /// Convert f64 to f32
 ///
@@ -42,34 +44,6 @@ pub fn to_f32(x: f64) -> Result<f32, Box<dyn Error>> {
 		Err(String::from("f32 overflow during conversion").into())
 	} else {
 		Ok(y)
-	}
-}
-
-/// Ram memory
-///
-///
-#[derive(Clone, Deserialize, Serialize)]
-pub struct Memory {
-	pub total: u64,
-	pub used: u64,
-}
-
-impl Memory {
-	/// Try into active model
-	///
-	///
-	pub fn try_into_active_model(
-		&self,
-		system_resources_id: i64,
-	) -> Result<SystemMemoryActiveModel, Box<dyn Error>> {
-		let system_mem = SystemMemoryActiveModel {
-			total: ActiveValue::Set(i64::try_from(self.total)?),
-			used: ActiveValue::Set(i64::try_from(self.used)?),
-			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-			..Default::default()
-		};
-
-		Ok(system_mem)
 	}
 }
 
@@ -158,10 +132,10 @@ impl Resources {
 	// pub fn from_model(
 	// 	model: SystemResourcesModel,
 	// 	cpus: Vec<SystemCoreModel>
-	// ) -> Option<Self> {
+	// ) -> Result<Self, Box<dyn Error>> {
 	// 	let model = model.into_active_model();
-	// 	let model = Self::from_active_model(model);
-
+	// 	let model = Self::from_active_model(model)?;
+		
 	// 	model
 	// }
 
@@ -201,7 +175,7 @@ impl Resources {
 		
 	// 	// Storage
 	// 	let mut storages: Vec<Storage> = vec![];
-    //     for storage in storage_active_model.clone().take() {
+    //     for storage in storage_active_model.clone() {
     //         storages.push(Storage::from_active_model(storage)?);
     //     }
 		
