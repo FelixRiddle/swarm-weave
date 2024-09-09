@@ -1,18 +1,9 @@
 use chrono::{offset::LocalResult, DateTime, TimeZone, Utc};
 use entity::{
 	server_node::Model as ServerNodeModel,
-	storage_device::{
-		ActiveModel as StorageDevice,
-		Entity as StorageDeviceEntity
-	},
-	system_core::{
-		ActiveModel as SystemCoreActiveModel,
-		Model as SystemCoreModel,
-	},
-	system_memory::{
-		ActiveModel as SystemMemoryActiveModel,
-		Model as SystemMemoryModel,
-	},
+	storage_device::{ActiveModel as StorageDevice, Entity as StorageDeviceEntity},
+	system_core::{ActiveModel as SystemCoreActiveModel, Model as SystemCoreModel},
+	system_memory::{ActiveModel as SystemMemoryActiveModel, Model as SystemMemoryModel},
 	system_resources::{
 		ActiveModel as SystemResourcesActiveModel, Entity as SystemResourcesEntity,
 		Model as SystemResourcesModel,
@@ -126,20 +117,36 @@ impl Resources {
 		system_resources
 	}
 
-	// /// Create from model
-	// ///
-	// /// It's converted from active model for simplicity, but I think it would be faster if it's converted from the normal model instead
-	// pub fn from_model(
-	// 	model: SystemResourcesModel,
-	// 	cpus: Vec<SystemCoreModel>,
-	// 	memory: SystemMemoryModel,
-    //     storage_active_model: Vec<StorageDeviceEntity>
-	// ) -> Result<Self, Box<dyn Error>> {
-	// 	let model = model.into_active_model();
-	// 	let model = Self::from_active_model(model)?;
-		
-	// 	model
-	// }
+	/// Create from models
+	///
+	/// It's converted from active model for simplicity, but I think it would be faster if it's converted from the normal model instead
+	pub fn from_models(
+		model: SystemResourcesModel,
+		cpus: Vec<SystemCoreModel>,
+		memory: SystemMemoryModel,
+		storage_active_model: Vec<StorageDevice>,
+	) -> Result<Self, Box<dyn Error>> {
+		let model = model.into_active_model();
+
+		// Cpu Cores
+		let mut cpu_active_models: Vec<SystemCoreActiveModel> = vec![];
+		for cpu in cpus {
+			cpu_active_models.push(cpu.into_active_model());
+		}
+
+		// Memory
+		let memory = memory.into_active_model();
+
+		// Storage
+		let mut storages = vec![];
+		for storage in storage_active_model.clone() {
+			storages.push(storage.into_active_model());
+		}
+
+		let model = Self::from_active_model(model, cpu_active_models, memory, storages)?;
+
+		Ok(model)
+	}
 
 	/// Create from active model
 	///
@@ -148,37 +155,39 @@ impl Resources {
 		active_model: SystemResourcesActiveModel,
 		cpus_active_model: Vec<SystemCoreActiveModel>,
 		memory: SystemMemoryActiveModel,
-		storage_active_model: Vec<StorageDevice>
+		storage_active_model: Vec<StorageDevice>,
 	) -> Result<Self, Box<dyn Error>> {
 		// Get evaluation time
 		let eval_time: DateTime<Utc> = match active_model.eval_time.clone().take() {
 			Some(value) => {
 				let eval_time = match Utc.from_local_datetime(&value) {
 					LocalResult::Single(eval_time) => eval_time,
-					LocalResult::Ambiguous(_option_1, _option_2) => return Err(format!("Ambiguous date time").into()),
-					LocalResult::None => return Err(format!("Incorrect date time").into())
+					LocalResult::Ambiguous(_option_1, _option_2) => {
+						return Err(format!("Ambiguous date time").into())
+					}
+					LocalResult::None => return Err(format!("Incorrect date time").into()),
 				};
-				
+
 				eval_time
-			},
-            None => return Err("eval_time is missing".into()),
+			}
+			None => return Err("eval_time is missing".into()),
 		};
-		
+
 		// Cpu Cores
 		let mut cpus: Vec<Cpu> = vec![];
 		for cpu in cpus_active_model {
 			cpus.push(Cpu::from_active_model(cpu)?);
 		}
-		
+
 		// Memory
 		let memory = Memory::from_active_model(memory)?;
-		
+
 		// Storage
 		let mut storages: Vec<Storage> = vec![];
-        for storage in storage_active_model.clone() {
-            storages.push(Storage::from_active_model(storage)?);
-        }
-		
+		for storage in storage_active_model.clone() {
+			storages.push(Storage::from_active_model(storage)?);
+		}
+
 		Ok(Resources {
 			cpus,
 			memory,
@@ -216,9 +225,9 @@ impl SystemResourcesController {
 			.clone()
 			.insert(&self.db)
 			.await?;
-		
+
 		// self.system_resources_active_model = Some(local_system_resources_instance);
-		
+
 		// Create system core instances
 		let system_core_controller = CpuCoreController::new(
 			self.db.clone(),
