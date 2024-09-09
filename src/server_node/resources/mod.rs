@@ -128,10 +128,12 @@ impl Resources {
 
 	// /// Create from model
 	// ///
-	// ///
+	// /// It's converted from active model for simplicity, but I think it would be faster if it's converted from the normal model instead
 	// pub fn from_model(
 	// 	model: SystemResourcesModel,
-	// 	cpus: Vec<SystemCoreModel>
+	// 	cpus: Vec<SystemCoreModel>,
+	// 	memory: SystemMemoryModel,
+    //     storage_active_model: Vec<StorageDeviceEntity>
 	// ) -> Result<Self, Box<dyn Error>> {
 	// 	let model = model.into_active_model();
 	// 	let model = Self::from_active_model(model)?;
@@ -149,7 +151,7 @@ impl Resources {
 	// 	storage_active_model: Vec<StorageDevice>
 	// ) -> Result<Self, Box<dyn Error>> {
 	// 	let eval_time = match active_model.eval_time.clone().take() {
-	// 		Some(value) => value.into(),
+	// 		Some(value) => value.with_timezone(&Utc),
     //         None => return Err("eval_time is missing".into()),
 	// 	};
 		
@@ -160,18 +162,7 @@ impl Resources {
 	// 	}
 		
 	// 	// Memory
-	// 	let total = match memory.total.clone().take() {
-	// 		Some(value) => value.into(),
-    //         None => return Err("Memory's total is missing".into()),
-	// 	};
-	// 	let used = match memory.used.clone().take() {
-    //         Some(value) => value.into(),
-    //         None => return Err("Memory's used is missing".into()),
-    //     };
-	// 	let memory = Memory {
-	// 		total: u64::try_from(total)?,
-	// 		used: u64::try_from(used)?,
-	// 	};
+	// 	let memory = Memory::from_active_model(memory)?;
 		
 	// 	// Storage
 	// 	let mut storages: Vec<Storage> = vec![];
@@ -182,7 +173,7 @@ impl Resources {
 	// 	Ok(Resources {
 	// 		cpus,
 	// 		memory,
-	// 		storage,
+	// 		storage: storages,
 	// 		eval_time,
 	// 	})
 	// }

@@ -1,9 +1,15 @@
+//! Storage model
+//! 
+//! TODO: Move down to resources folder
 use entity::storage_device::ActiveModel as StorageDeviceActiveModel;
 use serde::{Deserialize, Serialize};
 use sysinfo::{
     Disk, DiskKind as SysDiskKind,
 };
 use sea_orm::ActiveValue;
+use std::error::Error;
+
+use crate::model::FromActiveModel;
 
 /// Disk kind
 /// 
@@ -65,6 +71,54 @@ impl Storage {
 			is_removable: ActiveValue::Set(self.is_removable as i8),
 			kind: ActiveValue::Set(serde_json::to_string(&self.kind)?),
 			..Default::default()
+		})
+	}
+}
+
+impl FromActiveModel<StorageDeviceActiveModel, Self> for Storage {
+	fn from_active_model(active_model: StorageDeviceActiveModel) -> Result<Self, Box<dyn Error>> {
+		// Get total
+		let total = match active_model.total.clone().take() {
+			Some(total) => total as u64,
+            None => return Err("Total space is not provided".into()),
+		};
+		
+		// Get used
+		let used = match active_model.total.clone().take() {
+			Some(used) => used as u64,
+            None => return Err("Total space is not provided".into()),
+		};
+		
+		// Disk kind
+		let kind = match active_model.kind.clone().take() {
+			Some(kind) => serde_json::from_str::<DiskKind>(&kind)?,
+            None => return Err("Failed to parse disk kind".into()),
+		};
+		
+		// Name
+		let name = match active_model.name.clone().take() {
+            Some(name) => name,
+            None => return Err("Disk name is not provided".into()),
+        };
+        
+        // Is removable
+        let is_removable = match active_model.is_removable.clone().take() {
+            Some(is_removable) => {
+				match is_removable {
+					1 => true,
+					0 => false,
+                    _ => return Err("Failed to parse is removable flag".into()),
+				}
+			},
+            None => return Err("Is removable flag is not provided".into()),
+        };
+		
+		Ok(Self {
+			total,
+			used,
+			kind,
+			name,
+			is_removable,
 		})
 	}
 }
