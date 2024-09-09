@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{offset::LocalResult, DateTime, TimeZone, Utc};
 use entity::{
 	server_node::Model as ServerNodeModel,
 	storage_device::{
@@ -141,42 +141,51 @@ impl Resources {
 	// 	model
 	// }
 
-	// /// Create from active model
-	// ///
-	// ///
-	// pub fn from_active_model(
-	// 	active_model: SystemResourcesActiveModel,
-	// 	cpus_active_model: Vec<SystemCoreActiveModel>,
-	// 	memory: SystemMemoryActiveModel,
-	// 	storage_active_model: Vec<StorageDevice>
-	// ) -> Result<Self, Box<dyn Error>> {
-	// 	let eval_time = match active_model.eval_time.clone().take() {
-	// 		Some(value) => value.with_timezone(&Utc),
-    //         None => return Err("eval_time is missing".into()),
-	// 	};
+	/// Create from active model
+	///
+	///
+	pub fn from_active_model(
+		active_model: SystemResourcesActiveModel,
+		cpus_active_model: Vec<SystemCoreActiveModel>,
+		memory: SystemMemoryActiveModel,
+		storage_active_model: Vec<StorageDevice>
+	) -> Result<Self, Box<dyn Error>> {
+		// Get evaluation time
+		let eval_time: DateTime<Utc> = match active_model.eval_time.clone().take() {
+			Some(value) => {
+				let eval_time = match Utc.from_local_datetime(&value) {
+					LocalResult::Single(eval_time) => eval_time,
+					LocalResult::Ambiguous(_option_1, _option_2) => return Err(format!("Ambiguous date time").into()),
+					LocalResult::None => return Err(format!("Incorrect date time").into())
+				};
+				
+				eval_time
+			},
+            None => return Err("eval_time is missing".into()),
+		};
 		
-	// 	// Cpu Cores
-	// 	let mut cpus: Vec<Cpu> = vec![];
-	// 	for cpu in cpus_active_model {
-	// 		cpus.push(Cpu::from_active_model(cpu)?);
-	// 	}
+		// Cpu Cores
+		let mut cpus: Vec<Cpu> = vec![];
+		for cpu in cpus_active_model {
+			cpus.push(Cpu::from_active_model(cpu)?);
+		}
 		
-	// 	// Memory
-	// 	let memory = Memory::from_active_model(memory)?;
+		// Memory
+		let memory = Memory::from_active_model(memory)?;
 		
-	// 	// Storage
-	// 	let mut storages: Vec<Storage> = vec![];
-    //     for storage in storage_active_model.clone() {
-    //         storages.push(Storage::from_active_model(storage)?);
-    //     }
+		// Storage
+		let mut storages: Vec<Storage> = vec![];
+        for storage in storage_active_model.clone() {
+            storages.push(Storage::from_active_model(storage)?);
+        }
 		
-	// 	Ok(Resources {
-	// 		cpus,
-	// 		memory,
-	// 		storage: storages,
-	// 		eval_time,
-	// 	})
-	// }
+		Ok(Resources {
+			cpus,
+			memory,
+			storage: storages,
+			eval_time,
+		})
+	}
 }
 
 pub struct SystemResourcesController {
@@ -207,7 +216,9 @@ impl SystemResourcesController {
 			.clone()
 			.insert(&self.db)
 			.await?;
-
+		
+		// self.system_resources_active_model = Some(local_system_resources_instance);
+		
 		// Create system core instances
 		let system_core_controller = CpuCoreController::new(
 			self.db.clone(),
