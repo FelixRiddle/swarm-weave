@@ -152,11 +152,11 @@ impl SystemInfoController {
 		db: DatabaseConnection,
 		server_node_active_model: ServerNodeModel
 	) -> Result<SystemInfoModel, Box<dyn Error>> {
-		let server_location_id = match server_node_active_model.server_location_id {
+		let system_info_id = match server_node_active_model.system_info_id {
 			Some(id) => id,
 			None => return Err("Server location id not found".into()),
 		};
-		let server_location = match SystemInfoEntity::find_by_id(server_location_id).one(&db).await? {
+		let server_location = match SystemInfoEntity::find_by_id(system_info_id).one(&db).await? {
 			Some(model) => model,
 			None => return Err("Server location not found".into()),
 		};

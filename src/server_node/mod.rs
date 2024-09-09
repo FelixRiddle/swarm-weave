@@ -160,7 +160,7 @@ impl ServerNodeController {
 	// 				id: server_node_active_model.id.try_into()?,
 	// 				location: server_location,
 	// 				status: server_node_active_model.status.into(),
-	// 				resources: Resources::from_active_model(system_resources.ok_or("System resources not found")?)?,
+	// 				resources: Resources::from_active_model(system_resources)?,
 	// 				system_info,
 	// 			};
 				

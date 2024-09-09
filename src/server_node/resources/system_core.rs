@@ -10,6 +10,8 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
+use crate::model::FromActiveModel;
+
 use super::{to_f32, Resources};
 
 type SystemCoreColumn = <entity::prelude::SystemCore as EntityTrait>::Column;
@@ -41,6 +43,17 @@ impl CpuCore {
 		};
 
 		Ok(system_core_instance)
+	}
+}
+
+impl FromActiveModel<SystemCoreActiveModel, Self> for CpuCore {
+	fn from_active_model(active_model: SystemCoreActiveModel) -> Result<Self, Box<dyn Error>> {
+		let system_core_instance = active_model.try_into_model()?;
+		
+        Ok(CpuCore {
+            usage_percentage: system_core_instance.usage_percentage as f64,
+            free_percentage: system_core_instance.free_percentage as f64,
+        })
 	}
 }
 
@@ -268,137 +281,13 @@ impl CpuCoreController {
 
 		Ok(())
 	}
-
-	/// Update cores from resources
-	///
-	///
-	pub async fn update_all_cores_v1(&self) -> Result<(), Box<dyn Error>> {
-		// Cpus don't have identification
-		// Find related cpus
-		let mut cpus: Vec<SystemCoreModel> = self
-			.system_resources_instance
-			.clone()
-			.try_into_model()?
-			.find_related(SystemCoreEntity)
-			.all(&self.db)
-			.await?;
-
-		let local_cpus_quantity = i32::try_from(self.system_resources.cpus.len())?;
-
-		// Remove difference
-		let diff = i32::try_from(cpus.len())? - local_cpus_quantity;
-		println!(
-			"Current instances locally: {}",
-			self.system_resources.cpus.len()
-		);
-		println!("Existing instances in the database: {}", cpus.len());
-		println!("Absolute difference: {}", diff);
-
-		// It's done like this because cores cannot be identified
-		if diff < 0 {
-			println!("There are more cores in the database than in the system");
-
-			// Flip the sign
-			let diff = diff * -1;
-			println!("Diff: {diff}");
-
-			let cores_to_update = local_cpus_quantity - diff;
-			println!("Updating {cores_to_update} cores");
-
-			// Remove extras
-			let mut current: usize = 0;
-			while current < usize::try_from(diff)? {
-				let model = cpus[current].clone();
-
-				model.delete(&self.db).await?;
-
-				current += 1;
-			}
-
-			// Update those that remain
-			let remaining = cpus.len() - current;
-			println!("Remaining: {}", remaining);
-
-			// From the vector remove those that are before the current index
-			let mut remaining_instances = cpus
-				.iter()
-				.skip(current)
-				.cloned()
-				.collect::<Vec<SystemCoreModel>>();
-
-			// Update remaining
-			for (index, remaining_instance) in remaining_instances.iter_mut().enumerate() {
-				remaining_instance.usage_percentage =
-					self.system_resources.cpus[index].usage_percentage as f32;
-				remaining_instance.free_percentage =
-					self.system_resources.cpus[index].free_percentage as f32;
-
-				remaining_instance
-					.clone()
-					.into_active_model()
-					.update(&self.db)
-					.await?;
-			}
-		} else if diff == 0 {
-			println!("Cores quantity hasn't changed");
-			for (index, cpu_core) in cpus.iter_mut().enumerate() {
-				let local_core = &self.system_resources.cpus[index];
-				cpu_core.usage_percentage = local_core.usage_percentage as f32;
-				cpu_core.free_percentage = local_core.free_percentage as f32;
-
-				cpu_core
-					.clone()
-					.into_active_model()
-					.update(&self.db)
-					.await?;
-			}
-		} else {
-			println!("There are more cores locally than in the database");
-
-			println!("Diff: {diff}");
-
-			let cores_to_update = local_cpus_quantity - diff;
-			println!("Updating {cores_to_update} cores");
-
-			// Update the first cores
-			let mut current: usize = 0;
-			while current < usize::try_from(cores_to_update)? {
-				let mut model = cpus[current].clone();
-
-				let local_core = &self.system_resources.cpus[current];
-				model.usage_percentage = local_core.usage_percentage as f32;
-				model.free_percentage = local_core.free_percentage as f32;
-
-				model.clone().into_active_model().update(&self.db).await?;
-
-				current += 1;
-			}
-
-			println!("Updated {current} cores");
-
-			// These are the remaining instances to insert
-			let mut remaining_instances: Vec<CpuCore> = self
-				.system_resources
-				.cpus
-				.iter()
-				// Skip all updated components
-				.skip(current)
-				.cloned()
-				.collect();
-
-			// Insert those that remain
-			let remaining = remaining_instances.len();
-			println!("Remaining to insert: {}", remaining);
-
-			// Insert remaining
-			for (_index, remaining_instance) in remaining_instances.iter_mut().enumerate() {
-				let system_core = self.create_system_core_instance(remaining_instance)?;
-				system_core.clone().insert(&self.db).await?;
-			}
-		}
-
-		Ok(())
-	}
+	
+	// /// Find cores
+	// /// 
+	// /// 
+	// pub fn find_cores(db: DatabaseConnection, system_resources_id: i64) -> Result<Vec<CpuCore>, Box<dyn Error>> {
+		
+	// }
 }
 
 #[cfg(test)]
