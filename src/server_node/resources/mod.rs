@@ -218,7 +218,7 @@ impl SystemResourcesController {
 	/// Insert data
 	///
 	/// Returns system resources id
-	pub async fn insert_data(&self) -> Result<i64, Box<dyn Error>> {
+	pub async fn insert_data(&mut self) -> Result<i64, Box<dyn Error>> {
 		// Create and insert resources
 		let local_system_resources_instance = self.resources.into_active_model();
 		let inserted_system_resources = local_system_resources_instance
@@ -226,7 +226,7 @@ impl SystemResourcesController {
 			.insert(&self.db)
 			.await?;
 
-		// self.system_resources_active_model = Some(local_system_resources_instance);
+		self.system_resources_active_model = Some(local_system_resources_instance);
 
 		// Create system core instances
 		let system_core_controller = CpuCoreController::new(
@@ -416,7 +416,7 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Call the insert_data function
-		let system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
 		system_resources_controller.insert_data().await.unwrap();
 
 		// Verify that data was inserted correctly
@@ -449,7 +449,7 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
 		let resource_id = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
@@ -527,7 +527,7 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
 		let resource_id = system_resources_controller.insert_data().await.unwrap();
 
 		// Get the ID of the inserted system resources
@@ -617,7 +617,7 @@ mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
 		let resource_id = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources

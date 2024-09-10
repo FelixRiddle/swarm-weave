@@ -325,7 +325,7 @@ pub mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
 		let resource_id: i64 = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
@@ -426,7 +426,7 @@ pub mod tests {
 		};
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
 		let resource_id: i64 = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
@@ -519,7 +519,7 @@ pub mod tests {
 		let resources = Resources::fetch_resources().unwrap();
 
 		// Insert initial data
-		let system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
 		let resource_id: i64 = system_resources_controller.insert_data().await.unwrap();
 
 		// Create system cores based on the updated resources
