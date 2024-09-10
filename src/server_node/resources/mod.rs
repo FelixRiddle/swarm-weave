@@ -199,7 +199,7 @@ impl Resources {
 
 pub struct SystemResourcesController {
 	pub db: DatabaseConnection,
-	pub resources: Resources,
+	resources: Option<Resources>,
 	system_resources_active_model: Option<SystemResourcesActiveModel>,
 }
 
@@ -207,11 +207,26 @@ impl SystemResourcesController {
 	/// Create new instance
 	///
 	///
-	pub fn new(db: DatabaseConnection, resources: Resources) -> Self {
+	pub fn new(db: DatabaseConnection, resources: Option<Resources>) -> Self {
 		SystemResourcesController {
 			db,
 			resources,
 			system_resources_active_model: None,
+		}
+	}
+	
+	/// Get or create sytem resources
+	/// 
+	/// Create it by fetching resources from the system
+	/// 
+	/// Or should it fetch them from the database?
+	pub fn get_resources(&self) -> Result<Resources, Box<dyn Error>> {
+		match self.resources {
+			Some(ref resources) => Ok(resources.clone()),
+            None => {
+                let resources = Resources::fetch_resources()?;
+                Ok(resources)
+            }
 		}
 	}
 
@@ -219,8 +234,10 @@ impl SystemResourcesController {
 	///
 	/// Returns system resources id
 	pub async fn insert_data(&mut self) -> Result<i64, Box<dyn Error>> {
+		let resources = self.get_resources()?;
+		
 		// Create and insert resources
-		let local_system_resources_instance = self.resources.into_active_model();
+		let local_system_resources_instance = resources.into_active_model();
 		let inserted_system_resources = local_system_resources_instance
 			.clone()
 			.insert(&self.db)
@@ -231,7 +248,7 @@ impl SystemResourcesController {
 		// Create system core instances
 		let system_core_controller = CpuCoreController::new(
 			self.db.clone(),
-			self.resources.clone(),
+			resources.clone(),
 			inserted_system_resources.into_active_model(),
 		);
 		let system_core_instances = system_core_controller.create_cores()?;
@@ -243,14 +260,13 @@ impl SystemResourcesController {
 		let system_resources_id = system_core_controller.id()?;
 		
 		// System memory instance
-		let system_memory_instance = self
-			.resources
+		let system_memory_instance = resources
 			.memory
 			.try_into_active_model(system_resources_id)?;
 		system_memory_instance.save(&self.db).await?;
 		
 		// Insert storage data
-		for storage in &self.resources.storage {
+		for storage in &resources.storage {
 			let storage_instance = storage.try_into_active_model(system_resources_id)?;
 			storage_instance.save(&self.db).await?;
 		}
@@ -266,30 +282,27 @@ impl SystemResourcesController {
 		system_resources_id: i64,
 		db: &DatabaseConnection,
 	) -> Result<(), Box<dyn Error>> {
-		println!("Id: {}", system_resources_id);
+		let resources = self.get_resources()?;
 		
 		// Create and insert resources
 		let system_resources_instance = SystemResourcesActiveModel {
-			eval_time: ActiveValue::Set(self.resources.eval_time.naive_utc()),
+			eval_time: ActiveValue::Set(resources.eval_time.naive_utc()),
 			id: ActiveValue::Unchanged(system_resources_id),
 		};
 		
 		// Update system cores
 		let system_core_controller = CpuCoreController::new(
 			db.clone(),
-			self.resources.clone(),
+			resources.clone(),
 			system_resources_instance.clone(),
 		);
 		system_core_controller.update_all_cores().await?;
-		
-		println!("Updated system cores");
 		
 		// System resources id
 		let system_resources_id = system_core_controller.id()?;
 		
 		// System memory instance
-		let system_memory_instance = self
-			.resources
+		let system_memory_instance = resources
 			.memory
 			.try_into_active_model(system_resources_id)?;
 		system_memory_instance.save(db).await?;
@@ -341,7 +354,7 @@ impl SystemResourcesController {
 		}
 		
 		// Insert storage data
-		for storage in &self.resources.storage {
+		for storage in &resources.storage {
 			let storage_instance = storage.try_into_active_model(system_resources_id)?;
 			storage_instance.save(db).await?;
 		}
@@ -378,6 +391,11 @@ impl SystemResourcesController {
 		
 		Ok(server_location)
 	}
+	
+	/// Find server node related models
+	/// 
+	/// 
+	pub fn find_server_node_related_models() {}
 }
 
 #[cfg(test)]
@@ -414,11 +432,8 @@ mod tests {
 		// Initialize database connection
 		let db = mysql_connection().await.unwrap();
 
-		// Fetch resources
-		let resources = Resources::fetch_resources().unwrap();
-
 		// Call the insert_data function
-		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), None);
 		system_resources_controller.insert_data().await.unwrap();
 
 		// Verify that data was inserted correctly
@@ -447,11 +462,8 @@ mod tests {
 		// Initialize database connection
 		let db = mysql_connection().await.unwrap();
 
-		// Fetch resources
-		let resources = Resources::fetch_resources().unwrap();
-
 		// Insert initial data
-		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), None);
 		let resource_id = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
@@ -484,7 +496,7 @@ mod tests {
 
 		// Call the update function
 		let mut system_resources_controller =
-			SystemResourcesController::new(db.clone(), updated_resources.clone());
+			SystemResourcesController::new(db.clone(), Some(updated_resources.clone()));
 		system_resources_controller.update(id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
@@ -525,11 +537,8 @@ mod tests {
 		// Initialize database connection
 		let db = mysql_connection().await.unwrap();
 
-		// Fetch resources
-		let resources = Resources::fetch_resources().unwrap();
-
 		// Insert initial data
-		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), None);
 		let resource_id = system_resources_controller.insert_data().await.unwrap();
 
 		// Get the ID of the inserted system resources
@@ -559,10 +568,10 @@ mod tests {
 			}],
 			eval_time: Utc::now(),
 		};
-
+		
 		// Call the update function
 		let mut system_resources_controller =
-			SystemResourcesController::new(db.clone(), updated_resources.clone());
+			SystemResourcesController::new(db.clone(), Some(updated_resources.clone()));
 		system_resources_controller.update(id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
@@ -615,11 +624,8 @@ mod tests {
 		// Initialize database connection
 		let db = mysql_connection().await.unwrap();
 
-		// Fetch resources
-		let resources = Resources::fetch_resources().unwrap();
-
 		// Insert initial data
-		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), None);
 		let resource_id = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
@@ -644,7 +650,7 @@ mod tests {
 
 		// Call the update function
 		let mut system_resources_controller =
-			SystemResourcesController::new(db.clone(), updated_resources.clone());
+			SystemResourcesController::new(db.clone(), Some(updated_resources.clone()));
 		system_resources_controller
 			.update(resource_id, &db)
 			.await

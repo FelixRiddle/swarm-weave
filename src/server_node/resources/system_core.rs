@@ -321,11 +321,8 @@ pub mod tests {
 		// Initialize database connection
 		let db = mysql_connection().await.unwrap();
 
-		// Fetch resources
-		let resources = Resources::fetch_resources().unwrap();
-
 		// Insert initial data
-		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), None);
 		let resource_id: i64 = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
@@ -426,7 +423,7 @@ pub mod tests {
 		};
 
 		// Insert initial data
-		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), Some(resources));
 		let resource_id: i64 = system_resources_controller.insert_data().await.unwrap();
 
 		// Update resources
@@ -465,7 +462,7 @@ pub mod tests {
 		};
 		
 		// Call the update function
-		let mut system_resources_controller = SystemResourcesController::new(db.clone(), updated_resources.clone());
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), Some(updated_resources.clone()));
 		system_resources_controller.update(resource_id, &db).await.unwrap();
 		
 		// Verify that the data was updated correctly
@@ -515,15 +512,16 @@ pub mod tests {
 		// Initialize database connection
 		let db = mysql_connection().await.unwrap();
 
-		// Fetch resources
-		let resources = Resources::fetch_resources().unwrap();
-
 		// Insert initial data
-		let mut system_resources_controller = SystemResourcesController::new(db.clone(), resources);
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), None);
 		let resource_id: i64 = system_resources_controller.insert_data().await.unwrap();
 
 		// Create system cores based on the updated resources
-		let mut system_cores = system_resources_controller.resources.cpus.clone();
+		let mut system_cores = system_resources_controller
+			.get_resources()
+			.unwrap()
+			.cpus
+			.clone();
 
 		// Update resources
 		let new_cores = vec![
@@ -575,7 +573,7 @@ pub mod tests {
 		};
 
 		// Call the update function
-		let mut system_resources_controller = SystemResourcesController::new(db.clone(), updated_resources.clone());
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), Some(updated_resources.clone()));
 		system_resources_controller.update(resource_id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
