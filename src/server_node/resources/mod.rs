@@ -227,7 +227,7 @@ impl SystemResourcesController {
 			.await?;
 
 		self.system_resources_active_model = Some(local_system_resources_instance);
-
+		
 		// Create system core instances
 		let system_core_controller = CpuCoreController::new(
 			self.db.clone(),
@@ -238,42 +238,42 @@ impl SystemResourcesController {
 		for system_core_instance in system_core_instances {
 			system_core_instance.save(&self.db).await?;
 		}
-
+		
 		// Take the id
 		let system_resources_id = system_core_controller.id()?;
-
+		
 		// System memory instance
 		let system_memory_instance = self
 			.resources
 			.memory
 			.try_into_active_model(system_resources_id)?;
 		system_memory_instance.save(&self.db).await?;
-
+		
 		// Insert storage data
 		for storage in &self.resources.storage {
 			let storage_instance = storage.try_into_active_model(system_resources_id)?;
 			storage_instance.save(&self.db).await?;
 		}
-
+		
 		Ok(system_resources_id)
 	}
-
+	
 	/// Update
-	///
-	///
+	/// 
+	/// 
 	pub async fn update(
-		&self,
+		&mut self,
 		system_resources_id: i64,
 		db: &DatabaseConnection,
 	) -> Result<(), Box<dyn Error>> {
 		println!("Id: {}", system_resources_id);
-
+		
 		// Create and insert resources
 		let system_resources_instance = SystemResourcesActiveModel {
 			eval_time: ActiveValue::Set(self.resources.eval_time.naive_utc()),
 			id: ActiveValue::Unchanged(system_resources_id),
 		};
-
+		
 		// Update system cores
 		let system_core_controller = CpuCoreController::new(
 			db.clone(),
@@ -281,28 +281,30 @@ impl SystemResourcesController {
 			system_resources_instance.clone(),
 		);
 		system_core_controller.update_all_cores().await?;
-
+		
 		println!("Updated system cores");
-
+		
 		// System resources id
 		let system_resources_id = system_core_controller.id()?;
-
+		
 		// System memory instance
 		let system_memory_instance = self
 			.resources
 			.memory
 			.try_into_active_model(system_resources_id)?;
 		system_memory_instance.save(db).await?;
-
+		
 		// Update storage
 		// We need to know how many storage devices do we have already
 		// We know storage devices name is unique
-		let system_resources_instance = system_resources_instance.try_into_model()?;
-		let existing_storage_devices = system_resources_instance
+		let system_resources_model = system_resources_instance
+			.clone()
+			.try_into_model()?;
+		let existing_storage_devices = system_resources_model
 			.find_related(StorageDeviceEntity)
 			.all(db)
 			.await?;
-
+		
 		// Compare with our storage devices and remove from the database those that aren't in this structure
 		let removed_devices: Vec<&entity::storage_device::Model> = existing_storage_devices
 			.iter()
@@ -316,11 +318,11 @@ impl SystemResourcesController {
 				if !is_there.is_empty() {
 					return true;
 				}
-
+				
 				false
 			})
 			.collect::<Vec<_>>();
-
+		
 		// Delete removed devices in parallel
 		let mut handles: Vec<tokio::task::JoinHandle<Result<(), anyhow::Error>>> = vec![];
 		for model in removed_devices {
@@ -332,18 +334,26 @@ impl SystemResourcesController {
 				Ok(())
 			}));
 		}
-
+		
 		// Wait for deletions to complete
 		for handle in handles {
 			handle.await??;
 		}
-
+		
 		// Insert storage data
 		for storage in &self.resources.storage {
 			let storage_instance = storage.try_into_active_model(system_resources_id)?;
 			storage_instance.save(db).await?;
 		}
-
+		
+		// It's a standard operation to save this at the end of everything else
+		// Save system resources evaluation time
+		system_resources_instance
+			.clone()
+			.save(db)
+			.await?;
+		self.system_resources_active_model = Some(system_resources_instance);
+		
 		Ok(())
 	}
 
@@ -473,7 +483,7 @@ mod tests {
 		let id: i64 = res_model.id;
 
 		// Call the update function
-		let system_resources_controller =
+		let mut system_resources_controller =
 			SystemResourcesController::new(db.clone(), updated_resources.clone());
 		system_resources_controller.update(id, &db).await.unwrap();
 
@@ -551,7 +561,7 @@ mod tests {
 		};
 
 		// Call the update function
-		let system_resources_controller =
+		let mut system_resources_controller =
 			SystemResourcesController::new(db.clone(), updated_resources.clone());
 		system_resources_controller.update(id, &db).await.unwrap();
 
@@ -633,7 +643,7 @@ mod tests {
 		};
 
 		// Call the update function
-		let system_resources_controller =
+		let mut system_resources_controller =
 			SystemResourcesController::new(db.clone(), updated_resources.clone());
 		system_resources_controller
 			.update(resource_id, &db)

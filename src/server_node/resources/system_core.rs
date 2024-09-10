@@ -463,11 +463,11 @@ pub mod tests {
 			],
 			eval_time: Utc::now(),
 		};
-
+		
 		// Call the update function
-		let system_resources_controller = SystemResourcesController::new(db.clone(), updated_resources.clone());
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), updated_resources.clone());
 		system_resources_controller.update(resource_id, &db).await.unwrap();
-
+		
 		// Verify that the data was updated correctly
 		let res_model = SystemResourcesEntity::find_by_id(resource_id)
 			.one(&db)
@@ -575,7 +575,7 @@ pub mod tests {
 		};
 
 		// Call the update function
-		let system_resources_controller = SystemResourcesController::new(db.clone(), updated_resources.clone());
+		let mut system_resources_controller = SystemResourcesController::new(db.clone(), updated_resources.clone());
 		system_resources_controller.update(resource_id, &db).await.unwrap();
 
 		// Verify that the data was updated correctly
