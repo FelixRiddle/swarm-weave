@@ -23,7 +23,7 @@ pub mod system_memory;
 use crate::model::FromActiveModel;
 
 use super::storage::Storage;
-use system_core::{CpuCore as Cpu, CpuCoreController};
+use system_core::{CpuCore as Cpu, controller::CpuCoreController};
 use system_memory::Memory;
 
 /// Convert f64 to f32

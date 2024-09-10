@@ -7,55 +7,11 @@ use entity::{
 use sea_orm::{
 	ActiveModelTrait, ActiveValue, ColumnTrait, Condition, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, TryIntoModel
 };
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 
-use crate::model::FromActiveModel;
-
-use super::{to_f32, Resources};
+use super::{to_f32, Resources, CpuCore};
 
 type SystemCoreColumn = <entity::prelude::SystemCore as EntityTrait>::Column;
-
-/// TODO: Rename to CpuCore or Core
-///
-///
-#[derive(Clone, Deserialize, Serialize)]
-pub struct CpuCore {
-	pub usage_percentage: f64,
-	pub free_percentage: f64,
-}
-
-impl CpuCore {
-	/// Convert into active model
-	///
-	///
-	pub fn try_into_active_model(
-		&self,
-		cpu: &CpuCore,
-		system_resources_id: i64,
-	) -> Result<SystemCoreActiveModel, Box<dyn Error>> {
-		// Create system core
-		let system_core_instance = SystemCoreActiveModel {
-			usage_percentage: ActiveValue::Set(to_f32(cpu.usage_percentage)?),
-			free_percentage: ActiveValue::Set(to_f32(cpu.free_percentage)?),
-			system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-			..Default::default()
-		};
-		
-		Ok(system_core_instance)
-	}
-}
-
-impl FromActiveModel<SystemCoreActiveModel, Self> for CpuCore {
-	fn from_active_model(active_model: SystemCoreActiveModel) -> Result<Self, Box<dyn Error>> {
-		let system_core_instance = active_model.try_into_model()?;
-		
-        Ok(CpuCore {
-            usage_percentage: system_core_instance.usage_percentage as f64,
-            free_percentage: system_core_instance.free_percentage as f64,
-        })
-	}
-}
 
 /// System core controller
 ///
@@ -158,16 +114,64 @@ impl CpuCoreController {
 			.iter()
 			.map(|cpu| self.create_system_core_instance(cpu))
 			.collect();
-
+		
 		system_core_instances
 	}
-
+	
+	// /// Insert cores
+	// /// 
+	// /// 
+	// pub async fn insert_cores(&self) -> Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> {
+		
+	// 	let system_resources_instance = self.get_system_resources_instance()?;
+	// 	let system_resources = self.get_resources()?;
+		
+	// 	// Cpus don't have identification
+	// 	// Find related cpus
+	// 	let mut cpus: Vec<SystemCoreModel> = system_resources_instance
+	// 		.clone()
+	// 		.try_into_model()?
+	// 		.find_related(SystemCoreEntity)
+	// 		.all(&self.db)
+	// 		.await?;
+		
+	// 	let mut cores = Vec::new();
+		
+	// 	Ok(cores)
+	// }
+	
+	// /// Update cores unchangeable
+	// /// 
+	// /// This function assumes that you don't change the processor ever
+	// pub async fn update_cores(&self) -> Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> {
+		
+	// 	let system_resources_instance = self.get_system_resources_instance()?;
+	// 	let system_resources = self.get_resources()?;
+		
+	// 	// Cpus don't have identification
+	// 	// Find related cpus
+	// 	let mut cpus: Vec<SystemCoreModel> = system_resources_instance
+	// 		.clone()
+	// 		.try_into_model()?
+	// 		.find_related(SystemCoreEntity)
+	// 		.all(&self.db)
+	// 		.await?;
+		
+	// 	let mut cores = Vec::new();
+		
+	// 	Ok(cores)
+	// }
+	
 	/// Update all cores
+	/// 
+	/// If you change processors from time to time
 	///
 	/// FIXME: Doesn't work
 	/// FIXME: Use 'save' instead of 'update', because update is lazy
 	/// 
 	/// TODO: While this doesn't wants to work, an alternative solution is to store them as json in a folder with the resources id as name
+	/// 
+	/// This would be the preferred solution, but it's hard to implement
 	pub async fn update_all_cores(&self) -> Result<(), Box<dyn Error>> {
 		let system_resources_instance = self.get_system_resources_instance()?;
 		let system_resources = self.get_resources()?;
