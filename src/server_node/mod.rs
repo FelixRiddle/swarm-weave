@@ -113,7 +113,7 @@ impl ServerNodeController {
 		system_info: SystemInfoActiveModel,
 	) -> Result<Self, Box<dyn Error>> {
 		let server_node = ServerNode::new(1)?;
-
+		
 		Ok(Self {
 			db,
 			server_node,

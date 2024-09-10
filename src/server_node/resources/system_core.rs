@@ -62,8 +62,8 @@ impl FromActiveModel<SystemCoreActiveModel, Self> for CpuCore {
 /// Because I'm tired of using references
 pub struct CpuCoreController {
 	pub db: DatabaseConnection,
-	pub system_resources: Resources,
-	pub system_resources_instance: SystemResourcesActiveModel,
+	system_resources: Option<Resources>,
+	system_resources_instance: Option<SystemResourcesActiveModel>,
 }
 
 /// Database and Resources
@@ -75,8 +75,8 @@ impl CpuCoreController {
 	///
 	pub fn new(
 		db: DatabaseConnection,
-		system_resources: Resources,
-		system_resources_instance: SystemResourcesActiveModel,
+		system_resources: Option<Resources>,
+		system_resources_instance: Option<SystemResourcesActiveModel>,
 	) -> Self {
 		Self {
 			db,
@@ -84,13 +84,38 @@ impl CpuCoreController {
 			system_resources_instance,
 		}
 	}
-
+	
+	/// Get resources
+	/// 
+	/// 
+	pub fn get_resources(&self) -> Result<Resources, Box<dyn Error>> {
+		let resources = match self.system_resources.clone() {
+			Some(resources) => resources,
+			None => Resources::fetch_resources()?
+		};
+		
+		Ok(resources)
+	}
+	
+	/// Get system resources instance
+	/// 
+	/// 
+	pub fn get_system_resources_instance(&self) -> Result<SystemResourcesActiveModel, Box<dyn Error>> {
+		let system_resources_instance = match self.system_resources_instance.clone() {
+			Some(instance) => instance,
+			None => return Err(format!("System resources instance doesn't exists, please fetch it or create it").into())
+		};
+		
+		Ok(system_resources_instance)
+    }
+	
 	/// Get id or throw error
-	///
-	///
+	/// 
+	/// 
 	pub fn id(&self) -> Result<i64, Box<dyn Error>> {
-		let mut system_resources_id = self.system_resources_instance.id.clone();
-		let system_resources_id = match system_resources_id.take() {
+		let system_resources_instance = self.get_system_resources_instance()?;
+		
+		let system_resources_id = match system_resources_instance.id.clone().take() {
 			Some(id) => id,
 			None => {
 				return Err(format!(
@@ -127,8 +152,8 @@ impl CpuCoreController {
 	///
 	///
 	pub fn create_cores(&self) -> Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> {
-		let system_core_instances: Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> = self
-			.system_resources
+		let system_resources = self.get_resources()?;
+		let system_core_instances: Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> = system_resources
 			.cpus
 			.iter()
 			.map(|cpu| self.create_system_core_instance(cpu))
@@ -144,21 +169,23 @@ impl CpuCoreController {
 	/// 
 	/// TODO: While this doesn't wants to work, an alternative solution is to store them as json in a folder with the resources id as name
 	pub async fn update_all_cores(&self) -> Result<(), Box<dyn Error>> {
+		let system_resources_instance = self.get_system_resources_instance()?;
+		let system_resources = self.get_resources()?;
+		
 		// Cpus don't have identification
 		// Find related cpus
-		let mut cpus: Vec<SystemCoreModel> = self
-			.system_resources_instance
+		let mut cpus: Vec<SystemCoreModel> = system_resources_instance
 			.clone()
 			.try_into_model()?
 			.find_related(SystemCoreEntity)
 			.all(&self.db)
 			.await?;
 
-		let local_cpus_quantity = i32::try_from(self.system_resources.cpus.len())?;
+		let local_cpus_quantity = i32::try_from(system_resources.cpus.len())?;
 
 		// Remove difference
 		let diff = i32::try_from(cpus.len())? - local_cpus_quantity;
-		println!("Local: {}", self.system_resources.cpus.len());
+		println!("Local: {}", system_resources.cpus.len());
 		println!("Database: {}", cpus.len());
 		println!("Absolute difference: {}", diff);
 		
@@ -191,8 +218,7 @@ impl CpuCoreController {
 			println!("Cores removed");
 			
 			// Reload the cpus vector from the database
-			cpus = self
-				.system_resources_instance
+			cpus = system_resources_instance
 				.clone()
 				.try_into_model()?
 				.find_related(SystemCoreEntity)
@@ -206,8 +232,8 @@ impl CpuCoreController {
 			
 			// Update the remaining cores
 			for (index, cpu_core) in cpus.iter_mut().enumerate() {
-				if index < self.system_resources.cpus.len() {
-					let local_core = &self.system_resources.cpus[index];
+				if index < system_resources.cpus.len() {
+					let local_core = &system_resources.cpus[index];
 					
 					cpu_core.usage_percentage = local_core.usage_percentage as f32;
 					cpu_core.free_percentage = local_core.free_percentage as f32;
@@ -223,7 +249,7 @@ impl CpuCoreController {
 		} else if diff == 0 {
 			println!("Cores quantity hasn't changed");
 			for (index, cpu_core) in cpus.iter_mut().enumerate() {
-				let local_core = &self.system_resources.cpus[index];
+				let local_core = &system_resources.cpus[index];
 
 				// Check if the local CPU usage has changed
 				if cpu_core.usage_percentage != local_core.usage_percentage as f32
@@ -250,7 +276,7 @@ impl CpuCoreController {
 			while current < cores_to_update {
 				let mut model = cpus[current].clone();
 
-				let local_core = &self.system_resources.cpus[current];
+				let local_core = &system_resources.cpus[current];
 				model.usage_percentage = local_core.usage_percentage as f32;
 				model.free_percentage = local_core.free_percentage as f32;
 
@@ -260,8 +286,7 @@ impl CpuCoreController {
 			}
 
 			// Insert the remaining new cores
-			let mut remaining_instances: Vec<CpuCore> = self
-				.system_resources
+			let mut remaining_instances: Vec<CpuCore> = system_resources
 				.cpus
 				.iter()
 				.skip(current)

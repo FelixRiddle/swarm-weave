@@ -142,9 +142,9 @@ impl Resources {
 		for storage in storage_active_model.clone() {
 			storages.push(storage.into_active_model());
 		}
-
+		
 		let model = Self::from_active_model(model, cpu_active_models, memory, storages)?;
-
+		
 		Ok(model)
 	}
 	
@@ -229,7 +229,7 @@ impl SystemResourcesController {
             }
 		}
 	}
-
+	
 	/// Insert data
 	///
 	/// Returns system resources id
@@ -242,14 +242,14 @@ impl SystemResourcesController {
 			.clone()
 			.insert(&self.db)
 			.await?;
-
+		
 		self.system_resources_active_model = Some(local_system_resources_instance);
 		
 		// Create system core instances
 		let system_core_controller = CpuCoreController::new(
 			self.db.clone(),
-			resources.clone(),
-			inserted_system_resources.into_active_model(),
+			Some(resources.clone()),
+			Some(inserted_system_resources.into_active_model()),
 		);
 		let system_core_instances = system_core_controller.create_cores()?;
 		for system_core_instance in system_core_instances {
@@ -293,8 +293,8 @@ impl SystemResourcesController {
 		// Update system cores
 		let system_core_controller = CpuCoreController::new(
 			db.clone(),
-			resources.clone(),
-			system_resources_instance.clone(),
+			Some(resources.clone()),
+			Some(system_resources_instance.clone()),
 		);
 		system_core_controller.update_all_cores().await?;
 		
@@ -395,7 +395,9 @@ impl SystemResourcesController {
 	/// Find server node related models
 	/// 
 	/// 
-	pub fn find_server_node_related_models() {}
+	pub fn find_server_node_related_models() {
+		
+	}
 }
 
 #[cfg(test)]
