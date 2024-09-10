@@ -1,11 +1,14 @@
 use entity::{
 	system_core::{
-		ActiveModel as SystemCoreActiveModel, Entity as SystemCoreEntity, Model as SystemCoreModel,
+		self,
+		ActiveModel as SystemCoreActiveModel,
+		Entity as SystemCoreEntity,
+		Model as SystemCoreModel,
 	},
 	system_resources::ActiveModel as SystemResourcesActiveModel,
 };
 use sea_orm::{
-	ActiveModelTrait, ActiveValue, ColumnTrait, Condition, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, TryIntoModel
+	ActiveModelTrait, ActiveValue, ColumnTrait, Condition, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, TryIntoModel
 };
 use std::error::Error;
 
@@ -41,6 +44,13 @@ impl CpuCoreController {
 		}
 	}
 	
+	/// Set system resources instance
+	/// 
+	/// 
+	pub fn set_system_resources_instance(&mut self, system_resources_instance: SystemResourcesActiveModel) {
+        self.system_resources_instance = Some(system_resources_instance);
+    }
+	
 	/// Get resources
 	/// 
 	/// 
@@ -65,9 +75,9 @@ impl CpuCoreController {
 		Ok(system_resources_instance)
     }
 	
-	/// Get id or throw error
+	/// Get system resources instance id
 	/// 
-	/// 
+	/// In case it's not found throws an error
 	pub fn id(&self) -> Result<i64, Box<dyn Error>> {
 		let system_resources_instance = self.get_system_resources_instance()?;
 		
@@ -120,7 +130,7 @@ impl CpuCoreController {
 	
 	// /// Insert cores
 	// /// 
-	// /// 
+	// /// TODO: Insert cores
 	// pub async fn insert_cores(&self) -> Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> {
 		
 	// 	let system_resources_instance = self.get_system_resources_instance()?;
@@ -143,6 +153,8 @@ impl CpuCoreController {
 	// /// Update cores unchangeable
 	// /// 
 	// /// This function assumes that you don't change the processor ever
+	// /// 
+	// /// TODO: Update cores
 	// pub async fn update_cores(&self) -> Result<Vec<SystemCoreActiveModel>, Box<dyn Error>> {
 		
 	// 	let system_resources_instance = self.get_system_resources_instance()?;
@@ -311,12 +323,22 @@ impl CpuCoreController {
 		Ok(())
 	}
 	
-	// /// Find cores
-	// /// 
-	// /// 
-	// pub fn find_cores(db: DatabaseConnection, system_resources_id: i64) -> Result<Vec<CpuCore>, Box<dyn Error>> {
+	/// Find cores
+	/// 
+	/// Make sure you set system resources instance
+	/// 
+	/// Returns models
+	pub async fn find_cores(&self) -> Result<Vec<SystemCoreModel>, Box<dyn Error>> {
+		let system_resources_id = self.id()?;
 		
-	// }
+		let cpu_core_models = SystemCoreEntity::find()
+			.filter(system_core::Column::SystemResourceId.eq(system_resources_id))
+			.order_by_asc(system_core::Column::Id)
+			.all(&self.db)
+			.await?;
+		
+		Ok(cpu_core_models)
+	}
 }
 
 #[cfg(test)]

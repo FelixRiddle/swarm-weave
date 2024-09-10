@@ -392,12 +392,20 @@ impl SystemResourcesController {
 		Ok(server_location)
 	}
 	
-	/// Find server node related models
-	/// 
-	/// 
-	pub fn find_server_node_related_models() {
+	// /// Find server node related models
+	// /// 
+	// /// 
+	// pub fn find_server_node_related_models() -> Result<(Vec<SystemCoreActiveModel>, SystemMemoryActiveModel, Vec<StorageDevice>), Box<dyn Error>>{
+	// 	// TODO: Get system core related models
+	// 	let mut cores = Vec::new();
 		
-	}
+		
+	// 	// TODO: Get system memory related model
+		
+	// 	// TODO: Get storage related models
+	// 	let mut storage_devices = Vec::new();
+		
+	// }
 }
 
 #[cfg(test)]
