@@ -127,7 +127,11 @@ impl ServerNodeController {
 	// /// TODO: Create new from server node id
 	// /// 
 	// /// 
-	// pub async fn new_from_server_node(db: DatabaseConnection, id: u32) -> Result<Self, Box<dyn Error>> {
+	// pub async fn new_from_server_node(
+	// 	db: DatabaseConnection,
+	// 	id: u32
+	// ) -> Result<Self, Box<dyn Error>> {
+	// 	// Find server node id
 	// 	let server_node_active_model = ServerNodeEntity::find_by_id(id).one(&db).await?;
 	// 	match server_node_active_model {
 	// 		Some(server_node_active_model) => {
@@ -142,7 +146,16 @@ impl ServerNodeController {
 	// 			// Find system resources
 	// 			let system_resources_model = SystemResourcesController::find_by_server_node_model(db.clone(), server_node_active_model)
 	// 				.await?;
-	// 			let system_resources = match Resources::from_model(system_resources_model.clone()) {
+				
+	// 			// Now I need to find resources submodels
+	// 			// TODO: Find system cores
+	// 			// TODO: Find memory
+	// 			// TODO: Find storage devices
+				
+	// 			let system_resources = match Resources::from_models(
+	// 				system_resources_model.clone(),
+					
+	// 			) {
 	// 				Some(system_resources) => system_resources,
 	// 				None => return Err("Couldn't convert system resources model to system resources".into())
 	// 			};
@@ -169,7 +182,7 @@ impl ServerNodeController {
 	// 				server_node,
 	// 				server_node_active_model: Some(server_node_active_model),
 	// 				server_location: server_location_model.into_active_model(),
-	// 				system_resources: system_resources.ok_or("System resources not found")?,
+	// 				system_resources: system_resources.into_active_model(),
 	// 				system_info: system_info.into_active_model(),
 	// 			})
 	// 		},

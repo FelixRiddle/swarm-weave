@@ -147,7 +147,7 @@ impl Resources {
 
 		Ok(model)
 	}
-
+	
 	/// Create from active model
 	///
 	///
@@ -172,22 +172,22 @@ impl Resources {
 			}
 			None => return Err("eval_time is missing".into()),
 		};
-
+		
 		// Cpu Cores
 		let mut cpus: Vec<Cpu> = vec![];
 		for cpu in cpus_active_model {
 			cpus.push(Cpu::from_active_model(cpu)?);
 		}
-
+		
 		// Memory
 		let memory = Memory::from_active_model(memory)?;
-
+		
 		// Storage
 		let mut storages: Vec<Storage> = vec![];
 		for storage in storage_active_model.clone() {
 			storages.push(Storage::from_active_model(storage)?);
 		}
-
+		
 		Ok(Resources {
 			cpus,
 			memory,
@@ -340,15 +340,7 @@ impl SystemResourcesController {
 
 		// Insert storage data
 		for storage in &self.resources.storage {
-			let storage_instance = StorageDevice {
-				name: ActiveValue::Set(storage.name.clone()),
-				total: ActiveValue::Set(i64::try_from(storage.total)?),
-				used: ActiveValue::Set(i64::try_from(storage.used)?),
-				system_resource_id: ActiveValue::Set(Some(system_resources_id)),
-				is_removable: ActiveValue::Set(storage.is_removable as i8),
-				kind: ActiveValue::Set(serde_json::to_string(&storage.kind)?),
-				..Default::default()
-			};
+			let storage_instance = storage.try_into_active_model(system_resources_id)?;
 			storage_instance.save(db).await?;
 		}
 
@@ -373,7 +365,7 @@ impl SystemResourcesController {
 			Some(model) => model,
 			None => return Err("Server location not found".into()),
 		};
-
+		
 		Ok(server_location)
 	}
 }
