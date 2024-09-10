@@ -276,7 +276,7 @@ impl SystemResourcesController {
 	
 	/// Update
 	/// 
-	/// 
+	/// TODO: This function is incomplete, update cores
 	pub async fn update(
 		&mut self,
 		system_resources_id: i64,
@@ -296,7 +296,7 @@ impl SystemResourcesController {
 			Some(resources.clone()),
 			Some(system_resources_instance.clone()),
 		);
-		system_core_controller.update_all_cores().await?;
+		// TODO: Update cores
 		
 		// System resources id
 		let system_resources_id = system_core_controller.id()?;
