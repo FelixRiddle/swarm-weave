@@ -20,7 +20,7 @@ pub mod system_info;
 
 pub use resources::{
 	Resources,
-	SystemResourcesController,
+	controller::SystemResourcesController,
 };
 pub use server_info::{
 	ServerInfo,
