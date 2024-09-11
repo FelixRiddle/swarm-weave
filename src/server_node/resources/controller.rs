@@ -241,14 +241,11 @@ mod tests {
 	
 	use super::*;
 	use crate::database::mysql_connection;
-	use crate::server_node::resources::to_f32;
-	use crate::server_node::storage::DiskKind;
-	use crate::server_node::{
-		resources::{
-			system_core::CpuCore,
-			system_memory::Memory,
-		},
-		storage::Storage,
+	use crate::server_node::resources::{
+		system_core::CpuCore,
+		system_memory::Memory,
+		storage::{DiskKind, Storage},
+		to_f32,
 	};
 	
 	#[test]

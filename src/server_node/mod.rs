@@ -15,7 +15,6 @@ use strum_macros::Display;
 
 pub mod resources;
 pub mod server_info;
-pub mod storage;
 pub mod system_info;
 
 pub use resources::{

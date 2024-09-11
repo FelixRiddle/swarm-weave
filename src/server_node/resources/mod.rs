@@ -17,12 +17,13 @@ use std::error::Error;
 use sysinfo::{Disks, System};
 
 pub mod controller;
+pub mod storage;
 pub mod system_core;
 pub mod system_memory;
 
 use crate::model::FromActiveModel;
 
-use super::storage::Storage;
+use storage::Storage;
 use system_core::CpuCore as Cpu;
 use system_memory::Memory;
 
