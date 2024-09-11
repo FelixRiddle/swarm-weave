@@ -5,6 +5,8 @@ use std::error::Error;
 
 use crate::model::FromActiveModel;
 
+pub mod controller;
+
 /// Ram memory
 ///
 ///
@@ -38,12 +40,12 @@ impl FromActiveModel<SystemMemoryActiveModel, Self> for Memory {
 		// Memory
 		let total = match active_model.total.clone().take() {
 			Some(value) => value,
-            None => return Err("Memory's total is missing".into()),
+			None => return Err("Memory's total is missing".into()),
 		};
 		let used = match active_model.used.clone().take() {
-            Some(value) => value,
-            None => return Err("Memory's used is missing".into()),
-        };
+			Some(value) => value,
+			None => return Err("Memory's used is missing".into()),
+		};
 		let memory = Memory {
 			total: u64::try_from(total)?,
 			used: u64::try_from(used)?,

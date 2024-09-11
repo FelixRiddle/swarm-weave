@@ -22,6 +22,7 @@ pub use resources::{
 	Resources,
 	controller::SystemResourcesController,
 	system_core::controller::CpuCoreController,
+	system_memory::controller::MemoryController,
 };
 pub use server_info::{
 	ServerInfo,
@@ -148,20 +149,27 @@ impl ServerNodeController {
 	// 			let system_resources_model = SystemResourcesController::find_by_server_node_model(db.clone(), server_node_active_model)
 	// 				.await?;
 				
-	// 			// Now I need to find resources submodels
+	// 			// Now I need to find resource submodels
+				
+	// 			// Cpu cores
 	// 			let cpu_core_controller = CpuCoreController::new(
 	// 				db.clone(),
 	// 				None,
 	// 				None
 	// 			);
-	// 			let cpu_cores = cpu_core_controller.find_cores_by_resources_id(system_resources_model.id).await?;
+	// 			let cpu_cores = cpu_core_controller.find_cores_by_resources_id(system_resources_model.id)
+	// 				.await?;
 				
-	// 			// TODO: Find memory
+	// 			// System memory
+	// 			let memory_controller = MemoryController::new(db.clone());
+	// 			let memory = memory_controller.get_system_memory_by_resources_id(system_resources_model.id)
+	// 				.await?;
+				
 	// 			// TODO: Find storage devices
 				
 	// 			let system_resources = match Resources::from_models(
 	// 				system_resources_model.clone(),
-					
+	// 				cpu_cores,
 	// 			) {
 	// 				Some(system_resources) => system_resources,
 	// 				None => return Err("Couldn't convert system resources model to system resources".into())
