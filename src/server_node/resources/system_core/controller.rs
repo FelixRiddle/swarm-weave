@@ -188,4 +188,17 @@ impl CpuCoreController {
 		
 		Ok(cpu_core_models)
 	}
+	
+	/// Find cores 
+	/// 
+	/// By using system resources id
+	pub async fn find_cores_by_resources_id(&self, system_resources_id: i64) -> Result<Vec<SystemCoreModel>, Box<dyn Error>> {
+		let cpu_core_models = SystemCoreEntity::find()
+			.filter(system_core::Column::SystemResourceId.eq(system_resources_id))
+			.order_by_asc(system_core::Column::Id)
+			.all(&self.db)
+			.await?;
+		
+		Ok(cpu_core_models)
+	}
 }

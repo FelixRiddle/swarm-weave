@@ -21,6 +21,7 @@ pub mod system_info;
 pub use resources::{
 	Resources,
 	controller::SystemResourcesController,
+	system_core::controller::CpuCoreController,
 };
 pub use server_info::{
 	ServerInfo,
@@ -148,7 +149,13 @@ impl ServerNodeController {
 	// 				.await?;
 				
 	// 			// Now I need to find resources submodels
-	// 			// TODO: Find system cores
+	// 			let cpu_core_controller = CpuCoreController::new(
+	// 				db.clone(),
+	// 				None,
+	// 				None
+	// 			);
+	// 			let cpu_cores = cpu_core_controller.find_cores_by_resources_id(system_resources_model.id).await?;
+				
 	// 			// TODO: Find memory
 	// 			// TODO: Find storage devices
 				
