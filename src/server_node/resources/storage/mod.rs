@@ -9,6 +9,8 @@ use sysinfo::{
 use sea_orm::ActiveValue;
 use std::error::Error;
 
+pub mod controller;
+
 use crate::model::FromActiveModel;
 
 /// Disk kind
