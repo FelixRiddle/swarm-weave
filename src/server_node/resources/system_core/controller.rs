@@ -91,7 +91,7 @@ impl CpuCoreController {
 
 		Ok(system_resources_id)
 	}
-
+	
 	/// Create system core instance
 	///
 	///
@@ -111,7 +111,7 @@ impl CpuCoreController {
 
 		Ok(system_core_instance)
 	}
-
+	
 	/// Create cores from resources
 	///
 	///

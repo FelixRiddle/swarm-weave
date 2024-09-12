@@ -1,6 +1,9 @@
 use chrono::{offset::LocalResult, DateTime, TimeZone, Utc};
 use entity::{
-	storage_device::ActiveModel as StorageDevice,
+	storage_device::{
+		ActiveModel as StorageDevice,
+		Model as StorageDeviceModel,
+	},
 	system_core::{ActiveModel as SystemCoreActiveModel, Model as SystemCoreModel},
 	system_memory::{ActiveModel as SystemMemoryActiveModel, Model as SystemMemoryModel},
 	system_resources::{
@@ -125,7 +128,7 @@ impl Resources {
 		model: SystemResourcesModel,
 		cpus: Vec<SystemCoreModel>,
 		memory: SystemMemoryModel,
-		storage_active_model: Vec<StorageDevice>,
+		storage_device_model: Vec<StorageDeviceModel>,
 	) -> Result<Self, Box<dyn Error>> {
 		let model = model.into_active_model();
 
@@ -140,7 +143,7 @@ impl Resources {
 
 		// Storage
 		let mut storages = vec![];
-		for storage in storage_active_model.clone() {
+		for storage in storage_device_model.clone() {
 			storages.push(storage.into_active_model());
 		}
 		

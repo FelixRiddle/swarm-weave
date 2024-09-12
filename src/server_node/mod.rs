@@ -22,6 +22,7 @@ pub use resources::{
 	controller::SystemResourcesController,
 	system_core::controller::CpuCoreController,
 	system_memory::controller::MemoryController,
+	storage::controller::StorageController,
 };
 pub use server_info::{
 	ServerInfo,
@@ -144,35 +145,17 @@ impl ServerNodeController {
 	// 				None => return Err("Couldn't convert server location model to server info".into()),
 	// 			};
 				
+	// 			// TODO: Rather get the id, and find it inside the function
 	// 			// Find system resources
 	// 			let system_resources_model = SystemResourcesController::find_by_server_node_model(db.clone(), server_node_active_model)
 	// 				.await?;
 				
-	// 			// Now I need to find resource submodels
-				
-	// 			// Cpu cores
-	// 			let cpu_core_controller = CpuCoreController::new(
-	// 				db.clone(),
-	// 				None,
-	// 				None
-	// 			);
-	// 			let cpu_cores = cpu_core_controller.find_cores_by_resources_id(system_resources_model.id)
-	// 				.await?;
-				
-	// 			// System memory
-	// 			let memory_controller = MemoryController::new(db.clone());
-	// 			let memory = memory_controller.get_system_memory_by_resources_id(system_resources_model.id)
-	// 				.await?;
-				
-	// 			// TODO: Find storage devices
-				
-	// 			let system_resources = match Resources::from_models(
-	// 				system_resources_model.clone(),
-	// 				cpu_cores,
-	// 			) {
-	// 				Some(system_resources) => system_resources,
-	// 				None => return Err("Couldn't convert system resources model to system resources".into())
-	// 			};
+	// 			// Create resources object from models
+	// 			let system_resources_controller = SystemResourcesController::new(db.clone(), None);
+	// 			let system_resources = system_resources_controller.find_by_id_and_get_resources(
+	// 				system_resources_model,
+	// 				system_resources_model.id,
+	// 			).await?;
 				
 	// 			// Find system info
 	// 			let system_info_model = SystemInfoController::find_by_server_node_model(db.clone(), server_node_active_model)

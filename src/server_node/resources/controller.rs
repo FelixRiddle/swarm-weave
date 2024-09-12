@@ -11,10 +11,12 @@ use sea_orm::{
 };
 use std::error::Error;
 
-use crate::server_node::resources::Resources;
-use super::system_core;
-
-use system_core::controller::CpuCoreController;
+use crate::server_node::resources::{
+	Resources,
+	storage::controller::StorageController,
+	system_core::controller::CpuCoreController,
+	system_memory::controller::MemoryController,
+};
 
 /// System resources controller
 /// 
@@ -35,6 +37,44 @@ impl SystemResourcesController {
 			resources,
 			system_resources_active_model: None,
 		}
+	}
+	
+	/// Find resources by id and create new Resources instance
+	/// 
+	/// 
+	pub async fn find_by_id_and_get_resources(
+		&self,
+		system_resources_model: SystemResourcesModel,
+		system_resources_id: i64
+	) -> Result<Resources, Box<dyn Error>> {
+		// Cpu cores
+		let cpu_core_controller = CpuCoreController::new(
+			self.db.clone(),
+			None,
+			None
+		);
+		let cpu_cores = cpu_core_controller.find_cores_by_resources_id(system_resources_id)
+			.await?;
+		
+		// System memory
+		let memory_controller = MemoryController::new(self.db.clone());
+		let memory = memory_controller.get_system_memory_by_resources_id(system_resources_id)
+			.await?;
+		
+		// Find storage devices
+		let storage_device_controller = StorageController::new(self.db.clone());
+		let storage_devices = storage_device_controller.find_by_resources_id(system_resources_id)
+			.await?;
+		
+		// Create system resources from models
+		let system_resources = Resources::from_models(
+			system_resources_model.clone(),
+			cpu_cores,
+			memory,
+			storage_devices,
+		)?;
+		
+		Ok(system_resources)
 	}
 	
 	/// Get or create sytem resources
