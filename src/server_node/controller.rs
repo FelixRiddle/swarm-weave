@@ -1,10 +1,20 @@
 use entity::server_node::{ActiveModel as ServerNodeActiveModel, Entity as ServerNodeEntity};
 use entity::{
-	server_location::ActiveModel as ServerLocationActiveModel,
-	system_info::ActiveModel as SystemInfoActiveModel,
-	system_resources::ActiveModel as SystemResourcesActiveModel,
+	server_location::{
+		ActiveModel as ServerLocationActiveModel,
+		Model as ServerLocationModel,
+	},
+	system_info::{
+		ActiveModel as SystemInfoActiveModel,
+		Model as SystemInfoModel,
+	},
+	system_resources::{
+		ActiveModel as SystemResourcesActiveModel,
+		Model as SystemResourcesModel,
+	},
+	server_node::Model as ServerNodeModel,
 };
-use sea_orm::{DatabaseConnection, EntityTrait};
+use sea_orm::{DatabaseConnection, EntityTrait, IntoActiveModel};
 use std::error::Error;
 
 use super::resources::controller::SystemResourcesController;
@@ -24,6 +34,8 @@ use super::{
 /// Server node controller
 ///
 /// Mainly for database manipulation
+/// 
+/// TODO: Make the rest of the models optional and fetch on creation or on-demand
 pub struct ServerNodeController {
 	pub db: DatabaseConnection,
 	pub server_node: Option<ServerNode>,
@@ -73,6 +85,34 @@ impl ServerNodeController {
 		Ok(server_node)
 	}
 	
+	/// Fetch server node side models
+	/// 
+	/// Temporal function for easier understanding
+	pub async fn server_node_side_models(db: &DatabaseConnection, server_node_model: ServerNodeModel) -> Result<
+		(ServerLocationModel, SystemInfoModel, SystemResourcesModel),
+		Box<dyn Error>
+	> {
+		// Find server location
+		let server_location_model = ServerInfoController::find_by_server_node_model(
+			db.clone(),
+			server_node_model.clone()
+		).await?;
+		
+		// Find system resources
+		let system_resources_model = SystemResourcesController::find_by_server_node_model(
+			db.clone(),
+			server_node_model.clone()
+		).await?;
+		
+		// Find system info
+		let system_info_model = SystemInfoController::find_by_server_node_model(
+			db.clone(),
+			server_node_model
+		).await?;
+		
+		Ok((server_location_model, system_info_model, system_resources_model))
+	}
+	
 	/// Create server node from id
 	/// 
 	/// 
@@ -81,15 +121,15 @@ impl ServerNodeController {
 		id: u32
 	) -> Result<ServerNode, Box<dyn Error>> {
 		// Find server node id
-		let server_node_active_model = ServerNodeEntity::find_by_id(id).one(&db).await?;
-		let server_node = match server_node_active_model {
-			Some(server_node_active_model) => {
+		let server_node_model = ServerNodeEntity::find_by_id(id).one(&db).await?;
+		let server_node = match server_node_model {
+			Some(server_node_model) => {
 				// Take status
-				let status = server_node_active_model.status.clone();
-				let server_node_id = server_node_active_model.id.clone();
+				let status = server_node_model.status.clone();
+				let server_node_id = server_node_model.id.clone();
 				
 				// Find server location
-				let server_location_model = ServerInfoController::find_by_server_node_model(db.clone(), server_node_active_model.clone())
+				let server_location_model = ServerInfoController::find_by_server_node_model(db.clone(), server_node_model.clone())
 					.await?;
 				let server_location = match ServerInfo::from_model(server_location_model.clone()) {
 					Some(server_location) => server_location,
@@ -97,7 +137,7 @@ impl ServerNodeController {
 				};
 				
 				// Find system resources
-				let system_resources_model = SystemResourcesController::find_by_server_node_model(db.clone(), server_node_active_model.clone())
+				let system_resources_model = SystemResourcesController::find_by_server_node_model(db.clone(), server_node_model.clone())
 					.await?;
 				
 				// Take id
@@ -111,7 +151,7 @@ impl ServerNodeController {
 				).await?;
 				
 				// Find system info
-				let system_info_model = SystemInfoController::find_by_server_node_model(db.clone(), server_node_active_model)
+				let system_info_model = SystemInfoController::find_by_server_node_model(db.clone(), server_node_model)
 					.await?;
 				let system_info = match SystemInfo::from_model(system_info_model.clone()) {
 					Some(system_info) => system_info,
@@ -140,27 +180,47 @@ impl ServerNodeController {
 		
 		Ok(server_node)
 	}
-
-	// /// TODO: Create new from server node id
-	// /// 
-	// /// 
-	// pub async fn new_from_server_node(
-	// 	db: DatabaseConnection,
-	// 	id: u32
-	// ) -> Result<Self, Box<dyn Error>> {
-	// 	let server_node = ServerNodeController::server_node_from_id(db, id)
-	// 		.await?;
+	
+	/// Create new from server node id
+	/// 
+	/// FIXME: There are many redundant database roundtrips
+	pub async fn new_from_server_node_id(
+		db: DatabaseConnection,
+		id: u32
+	) -> Result<Self, Box<dyn Error>> {
+		// FIXME: Server node side models are fetch first so there should be a way to pass them down to a new function as currently we are fetching the same data twice
+		// FIXME: Server node model is fetch twice too
 		
-	// 	Ok(Self {
-	// 		db,
-	// 		server_node,
-	// 		server_node_active_model: Some(server_node_active_model),
-	// 		server_location: server_location_model.into_active_model(),
-	// 		system_resources: system_resources.into_active_model(),
-	// 		system_info: system_info.into_active_model(),
-	// 	})
-	// }
-
+		// Find server node id
+		let server_node_model = ServerNodeEntity::find_by_id(id).one(&db).await?;
+		let server_node_model = match server_node_model {
+			Some(server_node_model) => server_node_model,
+			None => return Err("Server node not found".into()),
+        };
+		
+		let (
+			server_location_model,
+			system_info_model,
+			system_resources_model
+		) = Self::server_node_side_models(&db, server_node_model)
+			.await?;
+		let server_node = ServerNodeController::server_node_from_id(db.clone(), id)
+			.await?;
+		
+		let server_location_id = server_location_model.id.clone();
+		let system_resources_id = system_resources_model.id.clone();
+		let system_info_id = system_info_model.id.clone();
+		
+		Ok(Self {
+			db,
+			server_node: Some(server_node.clone()),
+			server_node_active_model: Some(server_node.try_into_active_model(server_location_id, system_resources_id, system_info_id)?),
+			server_location: server_location_model.into_active_model(),
+			system_resources: system_resources_model.into_active_model(),
+			system_info: system_info_model.into_active_model(),
+		})
+	}
+	
 	/// Get or create server node active model
 	///
 	/// On creation the server node will be inserted, to make things faster
@@ -219,7 +279,7 @@ impl ServerNodeController {
 		ServerNodeEntity::delete_by_id(id.clone())
 			.exec(&self.db)
 			.await?;
-
+		
 		Ok(self)
 	}
 
