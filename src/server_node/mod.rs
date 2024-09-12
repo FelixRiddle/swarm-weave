@@ -33,9 +33,26 @@ pub enum ServerStatus {
 	Maintenance,
 }
 
+impl ServerStatus {
+	/// Convert from status
+	/// 
+	/// I don't know why but this operation doesn't works with the trait, neither with the '.into()' function
+	pub fn from_status(status: Status) -> Self {
+		match status {
+            Status::Online => ServerStatus::Online,
+            Status::Offline => ServerStatus::Offline,
+            Status::Maintenance => ServerStatus::Maintenance,
+        }
+	}
+}
+
+/// From server status to status
+/// 
+/// 
 impl From<ServerStatus> for Status {
 	fn from(status: ServerStatus) -> Self {
 		match status {
+			// TODO: Should add 'Untracked' to signify that the status is not being tracked
 			ServerStatus::Online => Status::Online,
 			ServerStatus::Offline => Status::Offline,
 			ServerStatus::Maintenance => Status::Maintenance,

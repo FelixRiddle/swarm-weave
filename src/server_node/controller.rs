@@ -1,19 +1,13 @@
 use entity::server_node::{ActiveModel as ServerNodeActiveModel, Entity as ServerNodeEntity};
 use entity::{
-	sea_orm_active_enums::Status,
 	server_location::ActiveModel as ServerLocationActiveModel,
 	system_info::ActiveModel as SystemInfoActiveModel,
 	system_resources::ActiveModel as SystemResourcesActiveModel,
 };
-use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait};
-use serde::{Deserialize, Serialize};
+use sea_orm::{DatabaseConnection, EntityTrait};
 use std::error::Error;
-use strum_macros::Display;
 
-use super::resources::{
-	Resources,
-	controller::SystemResourcesController
-};
+use super::resources::controller::SystemResourcesController;
 use super::server_info::{
 	ServerInfo,
 	ServerInfoController,
@@ -22,63 +16,10 @@ use super::system_info::{
 	SystemInfo,
 	SystemInfoController,
 };
-
-#[derive(Clone, Debug, Display, PartialEq, Deserialize, Serialize)]
-pub enum ServerStatus {
-	Online,
-	Offline,
-	Maintenance,
-}
-
-impl From<ServerStatus> for Status {
-	fn from(status: ServerStatus) -> Self {
-		match status {
-			ServerStatus::Online => Status::Online,
-			ServerStatus::Offline => Status::Offline,
-			ServerStatus::Maintenance => Status::Maintenance,
-		}
-	}
-}
-
-#[derive(Clone, Deserialize, Serialize)]
-pub struct ServerNode {
-	pub id: u32,
-	pub location: ServerInfo,
-	pub status: ServerStatus,
-	pub resources: Resources,
-	pub system_info: SystemInfo,
-}
-
-impl ServerNode {
-	pub fn new(id: u32) -> Result<Self, Box<dyn Error>> {
-		Ok(Self {
-			id,
-			location: ServerInfo::new()?,
-			status: ServerStatus::Online,
-			resources: Resources::fetch_resources()?,
-			system_info: SystemInfo::new(),
-		})
-	}
-
-	/// Try into active model
-	///
-	///
-	pub fn try_into_active_model(
-		self,
-		server_location_id: i64,
-		resource_id: i64,
-		system_info_id: i64,
-	) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
-		Ok(ServerNodeActiveModel {
-			id: ActiveValue::Set(i64::try_from(self.id)?),
-			status: ActiveValue::Set(Some(self.status.into())),
-			server_location_id: ActiveValue::Set(Some(server_location_id)),
-			system_resource_id: ActiveValue::Set(Some(resource_id)),
-			system_info_id: ActiveValue::Set(Some(system_info_id)),
-			..Default::default()
-		})
-	}
-}
+use super::{
+	ServerStatus,
+	ServerNode,
+};
 
 /// Server node controller
 ///
@@ -116,61 +57,73 @@ impl ServerNodeController {
 		})
 	}
 	
-	// /// Create server node from id
-	// /// 
-	// /// 
-	// pub async fn server_node_from_id(
-	// 	db: DatabaseConnection,
-	// 	id: u32
-	// ) -> Result<ServerNode, Box<dyn Error>> {
-	// 	// Find server node id
-	// 	let server_node_active_model = ServerNodeEntity::find_by_id(id).one(&db).await?;
-	// 	let server_node = match server_node_active_model {
-	// 		Some(server_node_active_model) => {
-	// 			// Find server location
-	// 			let server_location_model = ServerInfoController::find_by_server_node_model(db.clone(), server_node_active_model)
-	// 				.await?;
-	// 			let server_location = match ServerInfo::from_model(server_location_model.clone()) {
-	// 				Some(server_location) => server_location,
-	// 				None => return Err("Couldn't convert server location model to server info".into()),
-	// 			};
+	/// Create server node from id
+	/// 
+	/// 
+	pub async fn server_node_from_id(
+		db: DatabaseConnection,
+		id: u32
+	) -> Result<ServerNode, Box<dyn Error>> {
+		// Find server node id
+		let server_node_active_model = ServerNodeEntity::find_by_id(id).one(&db).await?;
+		let server_node = match server_node_active_model {
+			Some(server_node_active_model) => {
+				// Take status
+				let status = server_node_active_model.status.clone();
+				let server_node_id = server_node_active_model.id.clone();
 				
-	// 			// TODO: Rather get the id, and find it inside the function
-	// 			// Find system resources
-	// 			let system_resources_model = SystemResourcesController::find_by_server_node_model(db.clone(), server_node_active_model)
-	// 				.await?;
+				// Find server location
+				let server_location_model = ServerInfoController::find_by_server_node_model(db.clone(), server_node_active_model.clone())
+					.await?;
+				let server_location = match ServerInfo::from_model(server_location_model.clone()) {
+					Some(server_location) => server_location,
+					None => return Err("Couldn't convert server location model to server info".into()),
+				};
 				
-	// 			// Create resources object from models
-	// 			let system_resources_controller = SystemResourcesController::new(db.clone(), None);
-	// 			let resources = system_resources_controller.find_by_id_and_get_resources(
-	// 				system_resources_model,
-	// 				system_resources_model.id,
-	// 			).await?;
+				// Find system resources
+				let system_resources_model = SystemResourcesController::find_by_server_node_model(db.clone(), server_node_active_model.clone())
+					.await?;
 				
-	// 			// Find system info
-	// 			let system_info_model = SystemInfoController::find_by_server_node_model(db.clone(), server_node_active_model)
-	// 				.await?;
-	// 			let system_info = match SystemInfo::from_model(system_info_model.clone()) {
-	// 				Some(system_info) => system_info,
-    //                 None => return Err("Couldn't convert system info model to system info".into()),
-	// 			};
+				// Take id
+				let system_resources_id = system_resources_model.id.clone();
 				
-	// 			// TODO: Create server node
-	// 			let server_node = ServerNode {
-	// 				id: server_node_active_model.id.try_into()?,
-	// 				location: server_location,
-	// 				status: server_node_active_model.status.into(),
-	// 				resources,
-	// 				system_info,
-	// 			};
+				// Create resources object from models
+				let system_resources_controller = SystemResourcesController::new(db.clone(), None);
+				let resources = system_resources_controller.find_by_id_and_get_resources(
+					system_resources_model,
+					system_resources_id,
+				).await?;
 				
-	// 			server_node
-	// 		},
-	// 		None => return Err("Server node not found".into()),
-	// 	};
+				// Find system info
+				let system_info_model = SystemInfoController::find_by_server_node_model(db.clone(), server_node_active_model)
+					.await?;
+				let system_info = match SystemInfo::from_model(system_info_model.clone()) {
+					Some(system_info) => system_info,
+                    None => return Err("Couldn't convert system info model to system info".into()),
+				};
+				
+				// Serve status
+				let status: ServerStatus = match status {
+					Some(status) => ServerStatus::from_status(status),
+                    None => ServerStatus::Offline,
+				};
+				
+				// Create server node
+				let server_node = ServerNode {
+					id: server_node_id.try_into()?,
+					location: server_location,
+					status,
+					resources,
+					system_info,
+				};
+				
+				server_node
+			},
+			None => return Err("Server node not found".into()),
+		};
 		
-	// 	Ok(server_node)
-	// }
+		Ok(server_node)
+	}
 
 	// /// TODO: Create new from server node id
 	// /// 
