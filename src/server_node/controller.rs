@@ -26,7 +26,7 @@ use super::{
 /// Mainly for database manipulation
 pub struct ServerNodeController {
 	pub db: DatabaseConnection,
-	pub server_node: ServerNode,
+	pub server_node: Option<ServerNode>,
 	server_node_active_model: Option<ServerNodeActiveModel>,
 	// Models
 	pub server_location: ServerLocationActiveModel,
@@ -40,12 +40,12 @@ impl ServerNodeController {
 	/// Fetch resources on creation
 	pub async fn new(
 		db: DatabaseConnection,
+		server_node: Option<ServerNode>,
 		server_node_active_model: Option<ServerNodeActiveModel>,
 		server_location: ServerLocationActiveModel,
 		system_resources: SystemResourcesActiveModel,
 		system_info: SystemInfoActiveModel,
 	) -> Result<Self, Box<dyn Error>> {
-		let server_node = ServerNode::new(1)?;
 		
 		Ok(Self {
 			db,
@@ -55,6 +55,22 @@ impl ServerNodeController {
 			system_resources,
 			system_info,
 		})
+	}
+	
+	/// Get server node
+	/// 
+	/// The server node is cloned
+	/// If server node doesn't exists create it
+	pub fn get_server_node(&self) -> Result<ServerNode, Box<dyn Error>> {
+		let server_node = match self.server_node.clone() {
+			Some(server_node) => server_node,
+			None => {
+				let server_node = ServerNode::new(1)?;
+				server_node
+			}
+		};
+		
+		Ok(server_node)
 	}
 	
 	/// Create server node from id
@@ -166,11 +182,13 @@ impl ServerNodeController {
 					Some(id) => id,
 					None => return Err("System info id is not provided".into()),
 				};
-				let model = self.server_node.clone().try_into_active_model(
-					server_location_id,
-					system_resource_id,
-					system_info_id,
-				)?;
+				let model = self
+					.get_server_node()?
+					.try_into_active_model(
+						server_location_id,
+						system_resource_id,
+						system_info_id,
+					)?;
 
 				self.server_node_active_model = Some(model.clone());
 
