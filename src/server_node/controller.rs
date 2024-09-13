@@ -46,6 +46,9 @@ pub struct ServerNodeController {
 	pub system_info: SystemInfoActiveModel,
 }
 
+/// Constructors
+/// 
+/// 
 impl ServerNodeController {
 	/// Create new
 	///
@@ -68,7 +71,12 @@ impl ServerNodeController {
 			system_info,
 		})
 	}
-	
+}
+
+/// Utility methods
+/// 
+/// 
+impl ServerNodeController {
 	/// Get server node
 	/// 
 	/// The server node is cloned
@@ -85,6 +93,82 @@ impl ServerNodeController {
 		Ok(server_node)
 	}
 	
+	/// Get or create server node active model
+	///
+	/// On creation the server node will be inserted, to make things faster
+	pub async fn get_server_node_active_model(
+		&mut self,
+	) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
+		let model = match &self.server_node_active_model {
+			Some(model) => model.clone(),
+			None => {
+				let server_location_id = match self.server_location.id.clone().take() {
+					Some(id) => id,
+					None => return Err("Server location id is not provided".into()),
+				};
+				let system_resource_id = match self.system_resources.id.clone().take() {
+					Some(id) => id,
+					None => return Err("System resource id is not provided".into()),
+				};
+				let system_info_id = match self.system_info.id.clone().take() {
+					Some(id) => id,
+					None => return Err("System info id is not provided".into()),
+				};
+				let model = self
+					.get_server_node()?
+					.try_into_active_model(
+						server_location_id,
+						system_resource_id,
+						system_info_id,
+					)?;
+
+				self.server_node_active_model = Some(model.clone());
+
+				model
+			}
+		};
+
+		Ok(model)
+	}
+
+	/// Insert
+	///
+	///
+	pub async fn insert(&mut self) -> Result<&mut Self, Box<dyn Error>> {
+		self.get_server_node_active_model().await?;
+		Ok(self)
+	}
+
+	/// Delete
+	///
+	///
+	pub async fn delete(&mut self) -> Result<&mut Self, Box<dyn Error>> {
+		let server_node_active_model = self.get_server_node_active_model().await?;
+		let id = match server_node_active_model.id.try_as_ref() {
+			Some(id) => id,
+			None => return Err("Server node id doesn't exists".into()),
+		};
+		ServerNodeEntity::delete_by_id(id.clone())
+			.exec(&self.db)
+			.await?;
+		
+		Ok(self)
+	}
+
+	/// Delete by id
+	///
+	///
+	pub async fn delete_by_id(db: &DatabaseConnection, id: u32) -> Result<(), Box<dyn Error>> {
+		ServerNodeEntity::delete_by_id(id).exec(db).await?;
+
+		Ok(())
+	}
+}
+
+/// Anonymous functions
+/// 
+/// Mostly for creating structures
+impl ServerNodeController {
 	/// Fetch server node side models
 	/// 
 	/// Temporal function for easier understanding
@@ -219,76 +303,5 @@ impl ServerNodeController {
 			system_resources: system_resources_model.into_active_model(),
 			system_info: system_info_model.into_active_model(),
 		})
-	}
-	
-	/// Get or create server node active model
-	///
-	/// On creation the server node will be inserted, to make things faster
-	pub async fn get_server_node_active_model(
-		&mut self,
-	) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
-		let model = match &self.server_node_active_model {
-			Some(model) => model.clone(),
-			None => {
-				let server_location_id = match self.server_location.id.clone().take() {
-					Some(id) => id,
-					None => return Err("Server location id is not provided".into()),
-				};
-				let system_resource_id = match self.system_resources.id.clone().take() {
-					Some(id) => id,
-					None => return Err("System resource id is not provided".into()),
-				};
-				let system_info_id = match self.system_info.id.clone().take() {
-					Some(id) => id,
-					None => return Err("System info id is not provided".into()),
-				};
-				let model = self
-					.get_server_node()?
-					.try_into_active_model(
-						server_location_id,
-						system_resource_id,
-						system_info_id,
-					)?;
-
-				self.server_node_active_model = Some(model.clone());
-
-				model
-			}
-		};
-
-		Ok(model)
-	}
-
-	/// Insert
-	///
-	///
-	pub async fn insert(&mut self) -> Result<&mut Self, Box<dyn Error>> {
-		self.get_server_node_active_model().await?;
-		Ok(self)
-	}
-
-	/// Delete
-	///
-	///
-	pub async fn delete(&mut self) -> Result<&mut Self, Box<dyn Error>> {
-		let server_node_active_model = self.get_server_node_active_model().await?;
-		let id = match server_node_active_model.id.try_as_ref() {
-			Some(id) => id,
-			None => return Err("Server node id doesn't exists".into()),
-		};
-		ServerNodeEntity::delete_by_id(id.clone())
-			.exec(&self.db)
-			.await?;
-		
-		Ok(self)
-	}
-
-	/// Delete by id
-	///
-	///
-	pub async fn delete_by_id(db: &DatabaseConnection, id: u32) -> Result<(), Box<dyn Error>> {
-		ServerNodeEntity::delete_by_id(id).exec(db).await?;
-
-		Ok(())
 	}
 }

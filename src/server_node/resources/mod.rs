@@ -171,7 +171,7 @@ impl Resources {
 					}
 					LocalResult::None => return Err(format!("Incorrect date time").into()),
 				};
-
+				
 				eval_time
 			}
 			None => return Err("eval_time is missing".into()),
