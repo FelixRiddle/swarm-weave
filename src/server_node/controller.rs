@@ -81,11 +81,14 @@ impl ServerNodeController {
 	/// 
 	/// The server node is cloned
 	/// If server node doesn't exists create it
-	pub fn get_server_node(&self) -> Result<ServerNode, Box<dyn Error>> {
+	pub fn get_server_node(&mut self) -> Result<ServerNode, Box<dyn Error>> {
 		let server_node = match self.server_node.clone() {
 			Some(server_node) => server_node,
 			None => {
 				let server_node = ServerNode::new(1)?;
+				
+				self.server_node = Some(server_node.clone());
+				
 				server_node
 			}
 		};
@@ -138,12 +141,35 @@ impl ServerNodeController {
 /// 
 /// 
 impl ServerNodeController {
-	// /// Get or create server location
-	// /// 
-	// /// TODO:
-	// pub async fn get_or_create_server_location(&mut self) -> Result<ServerLocationActiveModel, Box<dyn Error>> {
-	// 	let mut server_location_controller = ServerLocationController::new().await?;
-	// }
+	/// Get or create server location
+	/// 
+	/// 
+	pub async fn get_or_create_server_location(&mut self) -> Result<ServerLocationActiveModel, Box<dyn Error>> {
+		let server_location = match self.get_server_location() {
+			Ok(location) => location.clone(),
+            Err(_) => {
+				// Get server node
+				let server_node = self.get_server_node()?;
+				
+				// Create server info controller
+                let server_info_controller = ServerInfoController::new(
+                    self.db.clone(),
+					server_node.location.clone()
+                ).await?;
+                
+				let model = server_info_controller.insert()
+					.await?
+					.clone()
+					.into_active_model();
+				
+				self.server_location = Some(model.clone());
+				
+				model
+            }
+		};
+		
+		Ok(server_location)
+	}
 	
 	/// Get or insert server node active model
 	///
@@ -157,8 +183,12 @@ impl ServerNodeController {
 		let model = match self.get_server_node_active_model() {
 			Ok(model) => model.clone(),
 			Err(_) => {
-				// FIXME: Create in case it doesn't exists
-				let server_location_id = match self.get_server_location()?.id.clone().take() {
+				// Get or create server location
+				let server_location_id = match self.get_or_create_server_location()
+					.await?
+					.id
+					.clone()
+					.take() {
 					Some(id) => id,
 					None => return Err("Server location id is not provided".into()),
 				};

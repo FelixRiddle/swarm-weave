@@ -18,10 +18,20 @@ pub struct ServerInfoController {
 }
 
 impl ServerInfoController {
-	pub async fn new() -> Result<Self, Box<dyn Error>> {
+	/// Create new
+	/// 
+	/// 
+	pub async fn new(db: DatabaseConnection, server_info: ServerInfo) -> Result<Self, Box<dyn Error>> {
+		Ok(Self { db, server_info })
+	}
+	
+	/// Create new bare
+	/// 
+	/// 
+	pub async fn new_bare() -> Result<Self, Box<dyn Error>> {
 		let db = mysql_connection().await?;
 		let server_info = ServerInfo::new()?;
-
+		
 		Ok(Self { db, server_info })
 	}
 	
@@ -32,7 +42,7 @@ impl ServerInfoController {
 			.into_active_model()
 			.insert(&self.db)
 			.await?;
-
+		
 		Ok(result)
 	}
 	
@@ -126,13 +136,13 @@ pub mod tests {
 	
 	#[tokio::test]
 	async fn test_server_info_controller_new() {
-		let controller = ServerInfoController::new().await.unwrap();
+		let controller = ServerInfoController::new_bare().await.unwrap();
 		assert!(controller.server_info.name.len() > 0);
 	}
 	
 	#[tokio::test]
 	async fn test_server_info_controller_insert() {
-		let controller = ServerInfoController::new().await.unwrap();
+		let controller = ServerInfoController::new_bare().await.unwrap();
 
 		let inserted_model = controller.insert().await.unwrap();
 		assert!(inserted_model.id > 0);
@@ -140,7 +150,7 @@ pub mod tests {
 	
 	#[tokio::test]
 	async fn test_server_info_controller_update() {
-		let mut controller = ServerInfoController::new().await.unwrap();
+		let mut controller = ServerInfoController::new_bare().await.unwrap();
 
 		controller.clone().insert().await.unwrap();
 
@@ -155,7 +165,7 @@ pub mod tests {
 	
 	#[tokio::test]
 	async fn test_server_info_controller_update_using_controller() {
-		let mut controller = ServerInfoController::new().await.unwrap();
+		let mut controller = ServerInfoController::new_bare().await.unwrap();
 	
 		controller.clone().insert().await.unwrap();
 	
@@ -168,7 +178,7 @@ pub mod tests {
 	
 	#[tokio::test]
 	async fn test_server_info_controller_find() {
-		let mut controller = ServerInfoController::new().await.unwrap();
+		let mut controller = ServerInfoController::new_bare().await.unwrap();
 
 		let inserted_model = controller.clone().insert().await.unwrap();
 
@@ -178,7 +188,7 @@ pub mod tests {
 
 	#[tokio::test]
 	async fn test_server_info_controller_delete() {
-		let controller = ServerInfoController::new().await.unwrap();
+		let controller = ServerInfoController::new_bare().await.unwrap();
 
 		let inserted_model = controller.clone().insert().await.unwrap();
 
