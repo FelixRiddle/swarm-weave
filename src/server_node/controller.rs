@@ -142,6 +142,7 @@ impl ServerNodeController {
 	///
 	/// On creation the server node will be inserted, to make things faster
 	/// 
+	/// FIXME: It shouldn't require to be given other models
 	/// Requires server location, system resources and system info
 	pub async fn get_or_create_server_node_active_model(
 		&mut self,
@@ -149,16 +150,19 @@ impl ServerNodeController {
 		let model = match self.get_server_node_active_model() {
 			Ok(model) => model.clone(),
 			Err(_) => {
+				// FIXME: Create in case it doesn't exists
 				let server_location_id = match self.get_server_location()?.id.clone().take() {
 					Some(id) => id,
 					None => return Err("Server location id is not provided".into()),
 				};
 				
+				// FIXME: Create in case it doesn't exists
 				let system_resource_id = match self.get_system_resources()?.id.clone().take() {
 					Some(id) => id,
 					None => return Err("System resource id is not provided".into()),
 				};
 				
+				// FIXME: Create in case it doesn't exists
 				let system_info_id = match self.get_system_info()?.id.clone().take() {
 					Some(id) => id,
 					None => return Err("System info id is not provided".into()),
@@ -188,7 +192,17 @@ impl ServerNodeController {
 		self.get_or_create_server_node_active_model().await?;
 		Ok(self)
 	}
-
+	
+	/// Insert server node
+	/// 
+	/// 
+	pub async fn insert_server_node(&mut self, server_node: ServerNode) -> Result<&mut Self, Box<dyn Error>> {
+		self.server_node = Some(server_node);
+		self.get_or_create_server_node_active_model().await?;
+        
+        Ok(self)
+	}
+	
 	/// Delete
 	///
 	///
@@ -354,24 +368,6 @@ impl ServerNodeController {
 			system_info: Some(system_info_model.into_active_model()),
 		})
 	}
-	
-	// /// Create new from server node id
-	// /// 
-	// /// 
-	// pub async fn new_from_server_node(
-	// 	db: DatabaseConnection,
-	// 	node: ServerNode,
-	// ) -> Result<Self, Box<dyn Error>> {
-		
-	// 	Ok(Self {
-	// 		db,
-	// 		server_node: Some(server_node.clone()),
-	// 		server_node_active_model: Some(server_node.try_into_active_model(server_location_id, system_resources_id, system_info_id)?),
-	// 		server_location: server_location_model.into_active_model(),
-	// 		system_resources: system_resources_model.into_active_model(),
-	// 		system_info: system_info_model.into_active_model(),
-	// 	})
-	// }
 }
 
 // #[cfg(test)]
@@ -391,11 +387,5 @@ impl ServerNodeController {
 		
 // 		let server_node = ServerNode::new()
 // 			.unwrap();
-		
-// 		let server_node_controller = ServerNodeController::new(
-// 			db.clone(),
-// 			Some(server_node),
-			
-// 		)
 // 	}
 // }
