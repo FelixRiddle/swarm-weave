@@ -1,3 +1,6 @@
+//! Node
+//! 
+//! Represents a server node
 use entity::server_node::ActiveModel as ServerNodeActiveModel;
 use entity::sea_orm_active_enums::Status;
 use sea_orm::ActiveValue;
@@ -17,10 +20,7 @@ pub use resources::{
 	system_memory::controller::MemoryController,
 	storage::controller::StorageController,
 };
-pub use server_info::{
-	ServerInfo,
-	ServerInfoController,
-};
+pub use server_info::ServerInfo;
 pub use system_info::{
 	SystemInfo,
 	SystemInfoController,

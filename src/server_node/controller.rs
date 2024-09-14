@@ -20,7 +20,7 @@ use std::error::Error;
 use super::resources::controller::SystemResourcesController;
 use super::server_info::{
 	ServerInfo,
-	ServerInfoController,
+	controller::ServerInfoController,
 };
 use super::system_info::{
 	SystemInfo,
@@ -138,6 +138,13 @@ impl ServerNodeController {
 /// 
 /// 
 impl ServerNodeController {
+	// /// Get or create server location
+	// /// 
+	// /// TODO:
+	// pub async fn get_or_create_server_location(&mut self) -> Result<ServerLocationActiveModel, Box<dyn Error>> {
+	// 	let mut server_location_controller = ServerLocationController::new().await?;
+	// }
+	
 	/// Get or insert server node active model
 	///
 	/// On creation the server node will be inserted, to make things faster
