@@ -41,9 +41,9 @@ pub struct ServerNodeController {
 	pub server_node: Option<ServerNode>,
 	server_node_active_model: Option<ServerNodeActiveModel>,
 	// Models
-	pub server_location: ServerLocationActiveModel,
-	pub system_resources: SystemResourcesActiveModel,
-	pub system_info: SystemInfoActiveModel,
+	pub server_location: Option<ServerLocationActiveModel>,
+	pub system_resources: Option<SystemResourcesActiveModel>,
+	pub system_info: Option<SystemInfoActiveModel>,
 }
 
 /// Constructors
@@ -53,13 +53,13 @@ impl ServerNodeController {
 	/// Create new
 	///
 	/// Fetch resources on creation
-	pub async fn new(
+	pub fn new(
 		db: DatabaseConnection,
 		server_node: Option<ServerNode>,
 		server_node_active_model: Option<ServerNodeActiveModel>,
-		server_location: ServerLocationActiveModel,
-		system_resources: SystemResourcesActiveModel,
-		system_info: SystemInfoActiveModel,
+		server_location: Option<ServerLocationActiveModel>,
+		system_resources: Option<SystemResourcesActiveModel>,
+		system_info: Option<SystemInfoActiveModel>,
 	) -> Result<Self, Box<dyn Error>> {
 		
 		Ok(Self {
@@ -73,9 +73,9 @@ impl ServerNodeController {
 	}
 }
 
-/// Utility methods
+/// Local methods
 /// 
-/// 
+/// Methods that don't act on the database
 impl ServerNodeController {
 	/// Get server node
 	/// 
@@ -93,27 +93,77 @@ impl ServerNodeController {
 		Ok(server_node)
 	}
 	
-	/// Get or create server node active model
+	/// Get server location
+	/// 
+	/// 
+	pub fn get_server_location(&self) -> Result<&ServerLocationActiveModel, Box<dyn Error>> {
+		match &self.server_location {
+			Some(location) => Ok(location),
+			None => Err("Server location is not set".into()),
+		}
+	}
+	
+	/// Get system resources
+	/// 
+	/// 
+	pub fn get_system_resources(&self) -> Result<&SystemResourcesActiveModel, Box<dyn Error>> {
+		match &self.system_resources {
+			Some(resources) => Ok(resources),
+			None => Err("System resources are not set".into()),
+		}
+	}
+	
+	/// Get system info
+	/// 
+	/// 
+	pub fn get_system_info(&self) -> Result<&SystemInfoActiveModel, Box<dyn Error>> {
+		match &self.system_info {
+			Some(info) => Ok(info),
+			None => Err("System info is not set".into()),
+		}
+	}
+	
+	/// Get server node active model
+	/// 
+	/// 
+	pub fn get_server_node_active_model(&self) -> Result<&ServerNodeActiveModel, Box<dyn Error>> {
+		match &self.server_node_active_model {
+			Some(model) => Ok(model),
+			None => Err("Server node active model is not set".into()),
+		}
+	}
+}
+
+/// Utility methods
+/// 
+/// 
+impl ServerNodeController {
+	/// Get or insert server node active model
 	///
 	/// On creation the server node will be inserted, to make things faster
-	pub async fn get_server_node_active_model(
+	/// 
+	/// Requires server location, system resources and system info
+	pub async fn get_or_create_server_node_active_model(
 		&mut self,
 	) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
-		let model = match &self.server_node_active_model {
-			Some(model) => model.clone(),
-			None => {
-				let server_location_id = match self.server_location.id.clone().take() {
+		let model = match self.get_server_node_active_model() {
+			Ok(model) => model.clone(),
+			Err(_) => {
+				let server_location_id = match self.get_server_location()?.id.clone().take() {
 					Some(id) => id,
 					None => return Err("Server location id is not provided".into()),
 				};
-				let system_resource_id = match self.system_resources.id.clone().take() {
+				
+				let system_resource_id = match self.get_system_resources()?.id.clone().take() {
 					Some(id) => id,
 					None => return Err("System resource id is not provided".into()),
 				};
-				let system_info_id = match self.system_info.id.clone().take() {
+				
+				let system_info_id = match self.get_system_info()?.id.clone().take() {
 					Some(id) => id,
 					None => return Err("System info id is not provided".into()),
 				};
+				
 				let model = self
 					.get_server_node()?
 					.try_into_active_model(
@@ -121,21 +171,21 @@ impl ServerNodeController {
 						system_resource_id,
 						system_info_id,
 					)?;
-
+				
 				self.server_node_active_model = Some(model.clone());
-
+				
 				model
 			}
 		};
-
+		
 		Ok(model)
 	}
-
+	
 	/// Insert
 	///
 	///
 	pub async fn insert(&mut self) -> Result<&mut Self, Box<dyn Error>> {
-		self.get_server_node_active_model().await?;
+		self.get_or_create_server_node_active_model().await?;
 		Ok(self)
 	}
 
@@ -143,7 +193,7 @@ impl ServerNodeController {
 	///
 	///
 	pub async fn delete(&mut self) -> Result<&mut Self, Box<dyn Error>> {
-		let server_node_active_model = self.get_server_node_active_model().await?;
+		let server_node_active_model = self.get_or_create_server_node_active_model().await?;
 		let id = match server_node_active_model.id.try_as_ref() {
 			Some(id) => id,
 			None => return Err("Server node id doesn't exists".into()),
@@ -239,13 +289,13 @@ impl ServerNodeController {
 					.await?;
 				let system_info = match SystemInfo::from_model(system_info_model.clone()) {
 					Some(system_info) => system_info,
-                    None => return Err("Couldn't convert system info model to system info".into()),
+					None => return Err("Couldn't convert system info model to system info".into()),
 				};
 				
 				// Serve status
 				let status: ServerStatus = match status {
 					Some(status) => ServerStatus::from_status(status),
-                    None => ServerStatus::Offline,
+					None => ServerStatus::Offline,
 				};
 				
 				// Create server node
@@ -280,7 +330,7 @@ impl ServerNodeController {
 		let server_node_model = match server_node_model {
 			Some(server_node_model) => server_node_model,
 			None => return Err("Server node not found".into()),
-        };
+		};
 		
 		let (
 			server_location_model,
@@ -299,9 +349,53 @@ impl ServerNodeController {
 			db,
 			server_node: Some(server_node.clone()),
 			server_node_active_model: Some(server_node.try_into_active_model(server_location_id, system_resources_id, system_info_id)?),
-			server_location: server_location_model.into_active_model(),
-			system_resources: system_resources_model.into_active_model(),
-			system_info: system_info_model.into_active_model(),
+			server_location: Some(server_location_model.into_active_model()),
+			system_resources: Some(system_resources_model.into_active_model()),
+			system_info: Some(system_info_model.into_active_model()),
 		})
 	}
+	
+	// /// Create new from server node id
+	// /// 
+	// /// 
+	// pub async fn new_from_server_node(
+	// 	db: DatabaseConnection,
+	// 	node: ServerNode,
+	// ) -> Result<Self, Box<dyn Error>> {
+		
+	// 	Ok(Self {
+	// 		db,
+	// 		server_node: Some(server_node.clone()),
+	// 		server_node_active_model: Some(server_node.try_into_active_model(server_location_id, system_resources_id, system_info_id)?),
+	// 		server_location: server_location_model.into_active_model(),
+	// 		system_resources: system_resources_model.into_active_model(),
+	// 		system_info: system_info_model.into_active_model(),
+	// 	})
+	// }
 }
+
+// #[cfg(test)]
+// mod tests {
+// 	use sea_orm::{DatabaseConnection, EntityTrait};
+// 	use entity::server_node::Entity as ServerNodeEntity;
+	
+// 	use super::*;
+// 	use crate::database::mysql_connection;
+	
+// 	#[test]
+// 	async fn test_insert() {
+// 		// Create a test database connection
+// 		let db = mysql_connection()
+// 			.await
+// 			.unwrap();
+		
+// 		let server_node = ServerNode::new()
+// 			.unwrap();
+		
+// 		let server_node_controller = ServerNodeController::new(
+// 			db.clone(),
+// 			Some(server_node),
+			
+// 		)
+// 	}
+// }

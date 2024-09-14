@@ -62,6 +62,7 @@ impl From<ServerStatus> for Status {
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ServerNode {
+	// WARNING: This field is not used
 	pub id: u32,
 	pub location: ServerInfo,
 	pub status: ServerStatus,
