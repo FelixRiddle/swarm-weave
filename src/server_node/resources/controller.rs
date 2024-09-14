@@ -27,6 +27,9 @@ pub struct SystemResourcesController {
 	system_resources_active_model: Option<SystemResourcesActiveModel>,
 }
 
+/// Constructors
+/// 
+/// 
 impl SystemResourcesController {
 	/// Create new instance
 	///
@@ -37,6 +40,20 @@ impl SystemResourcesController {
 			resources,
 			system_resources_active_model: None,
 		}
+	}
+}
+
+impl SystemResourcesController {
+	/// Get resources active model
+	/// 
+	/// 
+	pub fn get_resources_active_model(&self) -> Result<SystemResourcesActiveModel, Box<dyn Error>> {
+		let system_resources = match self.system_resources_active_model.clone() {
+			Some(model) => model,
+            None => return Err("System resources active model doesn't exists, please fetch it or create it".into())
+		};
+		
+		Ok(system_resources)
 	}
 	
 	/// Find resources by id and create new Resources instance

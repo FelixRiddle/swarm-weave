@@ -171,6 +171,37 @@ impl ServerNodeController {
 		Ok(server_location)
 	}
 	
+	/// Get or create system resources
+	/// 
+	/// 
+	pub async fn get_or_create_system_resources(&mut self) -> Result<SystemResourcesActiveModel, Box<dyn Error>> {
+		let system_resources = match self.get_system_resources() {
+			Ok(system_resources) => system_resources.clone(),
+            Err(_) => {
+				// Get server node
+				let server_node = self.get_server_node()?;
+				
+				// Create system resources controller
+                let mut system_resources_controller = SystemResourcesController::new(
+                    self.db.clone(),
+					Some(server_node.resources.clone())
+                );
+                
+				system_resources_controller
+					.insert_data()
+					.await?;
+				
+				let model = system_resources_controller.get_resources_active_model()?;
+				
+				self.system_resources = Some(model.clone());
+				
+				model
+            }
+		};
+		
+		Ok(system_resources)
+	}
+	
 	/// Get or insert server node active model
 	///
 	/// On creation the server node will be inserted, to make things faster
@@ -184,7 +215,8 @@ impl ServerNodeController {
 			Ok(model) => model.clone(),
 			Err(_) => {
 				// Get or create server location
-				let server_location_id = match self.get_or_create_server_location()
+				let server_location_id = match self
+					.get_or_create_server_location()
 					.await?
 					.id
 					.clone()
@@ -193,8 +225,13 @@ impl ServerNodeController {
 					None => return Err("Server location id is not provided".into()),
 				};
 				
-				// FIXME: Create in case it doesn't exists
-				let system_resource_id = match self.get_system_resources()?.id.clone().take() {
+				// Get or create system resources
+				let system_resource_id = match self
+					.get_or_create_system_resources()
+					.await?
+					.id
+					.clone()
+					.take() {
 					Some(id) => id,
 					None => return Err("System resource id is not provided".into()),
 				};
