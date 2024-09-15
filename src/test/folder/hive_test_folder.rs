@@ -1,11 +1,14 @@
+//! Hive test folder
+//! 
+//! Because it seems almost impossible to perform normal testing, we need to grow or roots,
+//! and take finer control of the steps to test the p2p hive network configuration.
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::fs;
 
-/// Hive test folder
+/// Hive test folder structure abstraction
 /// 
-/// Because it seems almost impossible to perform normal testing, we need to grow or roots,
-/// and take finer control of the steps to test the p2p hive network configuration.
+/// 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HiveTestFolder {
     pub path: String,

@@ -320,12 +320,16 @@ mod tests {
     // use libp2p::Multiaddr;
     // use std::time::Duration;
     
-    use crate::test::folder::hive_folder_test_suite::HiveFolderTestSuite;
+    use crate::test::folder::{
+		hive_folder_test_suite::HiveFolderTestSuite,
+		hive_test_folder::HiveTestFolder
+	};
     
     #[tokio::test]
     async fn test_new_node() {
-		// // Create folder if it doesn't exist
-		// HiveTestFolder::default();
+		// Create folder if it doesn't exist
+		let test_folder = HiveTestFolder::default();
+		test_folder.create().unwrap();
 		
 		// Test suite
         let suite = HiveFolderTestSuite::default();

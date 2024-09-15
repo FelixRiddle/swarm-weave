@@ -1,3 +1,6 @@
+//! Test folder
+//! 
+//! Defaults to ".cache/test"
 pub mod hive_test_folder;
 pub mod hive_folder_test_suite;
 

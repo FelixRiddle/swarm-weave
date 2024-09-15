@@ -236,8 +236,7 @@ impl ServerNodeController {
 	///
 	/// On creation the server node will be inserted, to make things faster
 	/// 
-	/// FIXME: It shouldn't require to be given other models
-	/// Requires server location, system resources and system info
+	/// Every model is created and inserted in the database
 	pub async fn get_or_create_server_node_active_model(
 		&mut self,
 	) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
