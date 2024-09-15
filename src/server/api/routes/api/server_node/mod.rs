@@ -27,6 +27,8 @@ pub struct LocationRequest {
 
 /// Get server node information
 /// 
+/// When a server node location is given, this function can be used to retrieve node information and insert it on our database.
+/// 
 /// TODO: Finish this function
 pub async fn get_server_node_information(_req: HttpRequest, body: web::Json<LocationRequest>) -> Result<(), Box<dyn Error>> {
 	let location = body.location.clone();
@@ -45,8 +47,8 @@ pub async fn get_server_node_information(_req: HttpRequest, body: web::Json<Loca
 	
 	let server_node: ServerNode = serde_json::from_str(&server_info)?;
 	
-	// Create server node
-	// let server_node_controller = ServerNodeController::new()?;
+	// // Create server node
+	// let server_node_controller = ServerNodeController::new_bare()?;
 	
 	Ok(())
 }
