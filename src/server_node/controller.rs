@@ -202,6 +202,36 @@ impl ServerNodeController {
 		Ok(system_resources)
 	}
 	
+	/// Get or create system info
+	/// 
+	/// 
+	pub async fn get_or_create_system_info(&mut self) -> Result<SystemInfoActiveModel, Box<dyn Error>> {
+		let system_info = match self.get_system_info() {
+            Ok(info) => info.clone(),
+            Err(_) => {
+                // Get server node
+                let server_node = self.get_server_node()?;
+                
+                // Create system info controller
+                let system_info_controller = SystemInfoController::new(
+                    self.db.clone(),
+                    server_node.system_info.clone()
+                ).await?;
+                
+                let model = system_info_controller.insert()
+                    .await?
+                    .clone()
+                    .into_active_model();
+                
+                self.system_info = Some(model.clone());
+                
+                model
+            }
+        };
+        
+        Ok(system_info)
+	}
+	
 	/// Get or insert server node active model
 	///
 	/// On creation the server node will be inserted, to make things faster
@@ -236,8 +266,13 @@ impl ServerNodeController {
 					None => return Err("System resource id is not provided".into()),
 				};
 				
-				// FIXME: Create in case it doesn't exists
-				let system_info_id = match self.get_system_info()?.id.clone().take() {
+				// Get or create system info
+				let system_info_id = match self
+					.get_or_create_system_info()
+					.await?
+					.id
+					.clone()
+					.take() {
 					Some(id) => id,
 					None => return Err("System info id is not provided".into()),
 				};

@@ -324,6 +324,10 @@ mod tests {
     
     #[tokio::test]
     async fn test_new_node() {
+		// // Create folder if it doesn't exist
+		// HiveTestFolder::default();
+		
+		// Test suite
         let suite = HiveFolderTestSuite::default();
         let test_node = suite.create_server_node("127.0.0.1".to_string(), 45829).unwrap();
         

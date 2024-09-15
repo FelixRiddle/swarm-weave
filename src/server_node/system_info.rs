@@ -105,15 +105,28 @@ pub struct SystemInfoController {
 	pub system_info: SystemInfo,
 }
 
+/// System info controller
+/// 
+/// 
 impl SystemInfoController {
+	/// Create new system info controller
+	/// 
+	/// 
+	pub async fn new(db: DatabaseConnection, system_info: SystemInfo) -> Result<Self, Box<dyn Error>> {
+		Ok(Self { db: db.clone(), system_info })
+	}
+	
 	/// Create system info controller
 	/// 
 	/// Cloning a database connection is fine
-	pub async fn new(db: &DatabaseConnection) -> Result<Self, Box<dyn Error>> {
+	pub async fn new_bare(db: &DatabaseConnection) -> Result<Self, Box<dyn Error>> {
 		let system_info = SystemInfo::new();
 		
 		Ok(Self { db: db.clone(), system_info })
 	}
+}
+
+impl SystemInfoController {
 	
 	pub async fn insert(self) -> Result<SystemInfoModel, Box<dyn Error>> {
 		let result = self.system_info.clone().into_active_model().insert(&self.db).await?;
@@ -182,14 +195,14 @@ pub mod tests {
 	#[tokio::test]
 	async fn test_system_info_controller_new() {
 		let connection = mysql_connection().await.unwrap();
-		let controller = SystemInfoController::new(&connection).await.unwrap();
+		let controller = SystemInfoController::new_bare(&connection).await.unwrap();
 		assert!(controller.system_info.name.len() > 0);
 	}
 
 	#[tokio::test]
 	async fn test_system_info_controller_insert() {
 		let connection = mysql_connection().await.unwrap();
-		let controller = SystemInfoController::new(&connection).await.unwrap();
+		let controller = SystemInfoController::new_bare(&connection).await.unwrap();
 		let model = controller.clone().insert().await.unwrap();
 		assert!(model.name.len() > 0);
 		assert!(model.id > 0);
@@ -198,7 +211,7 @@ pub mod tests {
 	#[tokio::test]
 	async fn test_system_info_controller_update() {
 		let connection = mysql_connection().await.unwrap();
-		let mut controller = SystemInfoController::new(&connection).await.unwrap();
+		let mut controller = SystemInfoController::new_bare(&connection).await.unwrap();
 		
 		controller.system_info.name = "New name".to_string();
 		controller = controller.update().await.unwrap();
@@ -208,7 +221,7 @@ pub mod tests {
 	#[tokio::test]
 	async fn test_system_info_controller_find() {
 		let connection = mysql_connection().await.unwrap();
-		let controller = SystemInfoController::new(&connection).await.unwrap();
+		let controller = SystemInfoController::new_bare(&connection).await.unwrap();
 		
 		// Insert model
 		let model = controller.clone().insert().await.unwrap();
@@ -223,7 +236,7 @@ pub mod tests {
 	#[tokio::test]
 	async fn test_system_info_controller_delete() {
 		let connection = mysql_connection().await.unwrap();
-		let controller = SystemInfoController::new(&connection).await.unwrap();
+		let controller = SystemInfoController::new_bare(&connection).await.unwrap();
 		
 		let model = controller.clone().insert().await.unwrap();
 		let mut controller = controller.delete(model.id).await.unwrap();

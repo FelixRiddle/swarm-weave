@@ -31,6 +31,9 @@ impl HiveTestFolder {
         Ok(())
     }
     
+	/// Create
+	/// 
+	/// Create if it doesn't exists
     pub fn create(&self) -> std::io::Result<()> {
         if !Path::new(&self.path).exists() {
             fs::create_dir_all(&self.path)?;
