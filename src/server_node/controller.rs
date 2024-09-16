@@ -5,7 +5,7 @@ use entity::{
 	system_info::{ActiveModel as SystemInfoActiveModel, Model as SystemInfoModel},
 	system_resources::{ActiveModel as SystemResourcesActiveModel, Model as SystemResourcesModel},
 };
-use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, IntoActiveModel};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, IntoActiveModel};
 use std::error::Error;
 
 use super::resources::controller::SystemResourcesController;
@@ -278,6 +278,12 @@ impl ServerNodeController {
 					system_info_id,
 				)?;
 				
+				// Insert the model
+				active_model
+					.clone()
+					.insert(&self.db)
+					.await?;
+				
 				// Store on the controller
 				self.server_node_active_model = Some(active_model.clone());
 
@@ -507,7 +513,7 @@ mod tests {
 	use super::*;
 	use crate::database::mysql_connection;
 	
-	// TODO: Deep testing
+	// Deep testing
 	// These do perform operations on the database
 	#[tokio::test]
 	async fn test_insert() {
