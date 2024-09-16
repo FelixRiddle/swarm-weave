@@ -7,7 +7,7 @@ use entity::{
 	},
 };
 use sea_orm::{
-	ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait,
+	ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, ModelTrait,
 	TryIntoModel,
 };
 use std::error::Error;
@@ -116,35 +116,49 @@ impl SystemResourcesController {
 }
 
 impl SystemResourcesController {
-	/// Insert data
-	///
-	/// Returns system resources id
-	pub async fn insert(&mut self) -> Result<&mut Self, Box<dyn Error>> {
-		let resources = self.get_resources()?;
-
+	/// Insert model
+	/// 
+	/// 
+	async fn insert_model(&mut self, resources: Resources) -> Result<&mut Self, Box<dyn Error>> {
 		// Create and insert resources
-		let local_system_resources_instance = resources.into_active_model();
+		let mut local_system_resources_instance = resources.into_active_model();
 		let inserted_system_resources = local_system_resources_instance
 			.clone()
 			.insert(&self.db)
 			.await?;
-
-		self.system_resources_active_model = Some(local_system_resources_instance);
-
+		
+		// Update the id
+		local_system_resources_instance.id = ActiveValue::Unchanged(inserted_system_resources.id.clone());
+		
+		// Set on the controller
+        self.system_resources_active_model = Some(local_system_resources_instance);
+		
+		Ok(self)
+	}
+	
+	/// Insert data
+	///
+	/// 
+	pub async fn insert(&mut self) -> Result<&mut Self, Box<dyn Error>> {
+		// Create and insert resources
+		let resources = self.get_resources()?;
+		self.insert_model(resources.clone())
+			.await?;
+		
 		// Create system core instances
 		let system_core_controller = CpuCoreController::new(
 			self.db.clone(),
 			Some(resources.clone()),
-			Some(inserted_system_resources.into_active_model()),
+			Some(self.get_resources_active_model()?),
 		);
 		let system_core_instances = system_core_controller.create_cores()?;
 		for system_core_instance in system_core_instances {
 			system_core_instance.save(&self.db).await?;
 		}
-
+		
 		// Take the id
 		let system_resources_id = system_core_controller.id()?;
-
+		
 		// System memory instance
 		let system_memory_instance = resources
 			.memory
