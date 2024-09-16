@@ -5,7 +5,7 @@ use entity::{
 	system_info::{ActiveModel as SystemInfoActiveModel, Model as SystemInfoModel},
 	system_resources::{ActiveModel as SystemResourcesActiveModel, Model as SystemResourcesModel},
 };
-use sea_orm::{DatabaseConnection, EntityTrait, IntoActiveModel};
+use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, IntoActiveModel};
 use std::error::Error;
 
 use super::resources::controller::SystemResourcesController;
@@ -237,8 +237,8 @@ impl ServerNodeController {
 	pub async fn get_or_create_server_node_active_model(
 		&mut self,
 	) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
-		let model = match self.get_server_node_active_model() {
-			Ok(model) => model.clone(),
+		let active_model = match self.get_server_node_active_model() {
+			Ok(active_model) => active_model.clone(),
 			Err(_) => {
 				// Get or create server location
 				let server_location_id = match self
@@ -270,21 +270,37 @@ impl ServerNodeController {
 					Some(id) => id,
 					None => return Err("System info id is not provided".into()),
 				};
-
-				let model = self.get_server_node()?.try_into_active_model(
+				
+				// Convert to active model
+				let active_model = self.get_server_node()?.try_into_active_model(
 					server_location_id,
 					system_resource_id,
 					system_info_id,
 				)?;
+				
+				// Store on the controller
+				self.server_node_active_model = Some(active_model.clone());
 
-				self.server_node_active_model = Some(model.clone());
-
-				model
+				active_model
 			}
 		};
 
-		Ok(model)
+		Ok(active_model)
 	}
+	
+    /// Get server node id
+    ///
+    /// Returns the id of the server node
+    pub async fn id(&mut self) -> Result<i64, Box<dyn Error>> {
+		let active_model = self.get_or_create_server_node_active_model().await?;
+		
+		let id = match active_model.id.clone().take() {
+			Some(id) => id,
+            None => return Err("Server node id doesn't exists".into()),
+		};
+		
+		Ok(id)
+    }
 
 	/// Insert
 	///
@@ -493,7 +509,17 @@ mod tests {
 	
 	// TODO: Deep testing
 	// These do perform operations on the database
-	
+	#[tokio::test]
+	async fn test_insert() {
+		let db = mysql_connection().await.unwrap();
+		let mut controller = ServerNodeController::new_bare(db.clone()).unwrap();
+		
+		controller.insert().await.unwrap();
+		let id = controller.id().await.unwrap();
+		
+		let server_node_controller = ServerNodeController::new_from_server_node_id(db.clone(), id as u32).await.unwrap();
+		assert!(server_node_controller.server_node.is_some());
+	}
 	
 	// Shallow tests
 	// These don't perform operations on the database
