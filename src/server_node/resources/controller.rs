@@ -7,20 +7,19 @@ use entity::{
 	},
 };
 use sea_orm::{
-	ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait, TryIntoModel
+	ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait,
+	TryIntoModel,
 };
 use std::error::Error;
 
 use crate::server_node::resources::{
-	Resources,
-	storage::controller::StorageController,
-	system_core::controller::CpuCoreController,
-	system_memory::controller::MemoryController,
+	storage::controller::StorageController, system_core::controller::CpuCoreController,
+	system_memory::controller::MemoryController, Resources,
 };
 
 /// System resources controller
-/// 
-/// 
+///
+///
 pub struct SystemResourcesController {
 	pub db: DatabaseConnection,
 	resources: Option<Resources>,
@@ -28,8 +27,8 @@ pub struct SystemResourcesController {
 }
 
 /// Constructors
-/// 
-/// 
+///
+///
 impl SystemResourcesController {
 	/// Create new instance
 	///
@@ -43,46 +42,52 @@ impl SystemResourcesController {
 	}
 }
 
+/// Get methods
+///
+///
 impl SystemResourcesController {
 	/// Get resources active model
-	/// 
-	/// 
+	///
+	///
 	pub fn get_resources_active_model(&self) -> Result<SystemResourcesActiveModel, Box<dyn Error>> {
-		let system_resources = match self.system_resources_active_model.clone() {
-			Some(model) => model,
-            None => return Err("System resources active model doesn't exists, please fetch it or create it".into())
-		};
-		
+		let system_resources =
+			match self.system_resources_active_model.clone() {
+				Some(model) => model,
+				None => return Err(
+					"System resources active model doesn't exists, please fetch it or create it"
+						.into(),
+				),
+			};
+
 		Ok(system_resources)
 	}
-	
+
 	/// Find resources by id and create new Resources instance
-	/// 
-	/// 
+	///
+	///
 	pub async fn find_by_id_and_get_resources(
 		&self,
 		system_resources_model: SystemResourcesModel,
-		system_resources_id: i64
+		system_resources_id: i64,
 	) -> Result<Resources, Box<dyn Error>> {
 		// Cpu cores
-		let cpu_core_controller = CpuCoreController::new(
-			self.db.clone(),
-			None,
-			None
-		);
-		let cpu_cores = cpu_core_controller.find_cores_by_resources_id(system_resources_id)
+		let cpu_core_controller = CpuCoreController::new(self.db.clone(), None, None);
+		let cpu_cores = cpu_core_controller
+			.find_cores_by_resources_id(system_resources_id)
 			.await?;
-		
+
 		// System memory
 		let memory_controller = MemoryController::new(self.db.clone());
-		let memory = memory_controller.get_system_memory_by_resources_id(system_resources_id)
+		let memory = memory_controller
+			.get_system_memory_by_resources_id(system_resources_id)
 			.await?;
-		
+
 		// Find storage devices
 		let storage_device_controller = StorageController::new(self.db.clone());
-		let storage_devices = storage_device_controller.find_by_resources_id(system_resources_id)
+		let storage_devices = storage_device_controller
+			.find_by_resources_id(system_resources_id)
 			.await?;
-		
+
 		// Create system resources from models
 		let system_resources = Resources::from_models(
 			system_resources_model.clone(),
@@ -90,40 +95,42 @@ impl SystemResourcesController {
 			memory,
 			storage_devices,
 		)?;
-		
+
 		Ok(system_resources)
 	}
-	
+
 	/// Get or create sytem resources
-	/// 
+	///
 	/// Create it by fetching resources from the system
-	/// 
+	///
 	/// Or should it fetch them from the database?
 	pub fn get_resources(&self) -> Result<Resources, Box<dyn Error>> {
 		match self.resources {
 			Some(ref resources) => Ok(resources.clone()),
-            None => {
-                let resources = Resources::fetch_resources()?;
-                Ok(resources)
-            }
+			None => {
+				let resources = Resources::fetch_resources()?;
+				Ok(resources)
+			}
 		}
 	}
-	
+}
+
+impl SystemResourcesController {
 	/// Insert data
 	///
 	/// Returns system resources id
-	pub async fn insert_data(&mut self) -> Result<i64, Box<dyn Error>> {
+	pub async fn insert(&mut self) -> Result<&mut Self, Box<dyn Error>> {
 		let resources = self.get_resources()?;
-		
+
 		// Create and insert resources
 		let local_system_resources_instance = resources.into_active_model();
 		let inserted_system_resources = local_system_resources_instance
 			.clone()
 			.insert(&self.db)
 			.await?;
-		
+
 		self.system_resources_active_model = Some(local_system_resources_instance);
-		
+
 		// Create system core instances
 		let system_core_controller = CpuCoreController::new(
 			self.db.clone(),
@@ -134,27 +141,46 @@ impl SystemResourcesController {
 		for system_core_instance in system_core_instances {
 			system_core_instance.save(&self.db).await?;
 		}
-		
+
 		// Take the id
 		let system_resources_id = system_core_controller.id()?;
-		
+
 		// System memory instance
 		let system_memory_instance = resources
 			.memory
 			.try_into_active_model(system_resources_id)?;
 		system_memory_instance.save(&self.db).await?;
-		
+
 		// Insert storage data
 		for storage in &resources.storage {
 			let storage_instance = storage.try_into_active_model(system_resources_id)?;
 			storage_instance.save(&self.db).await?;
 		}
-		
-		Ok(system_resources_id)
+
+		Ok(self)
 	}
 	
-	/// Update
+	/// Get id
 	/// 
+	/// 
+	pub fn id(&self) -> Result<i64, Box<dyn Error>> {
+		let system_resources_instance = self.get_resources_active_model()?;
+        
+        let system_resources_id = match system_resources_instance.id.clone().take() {
+            Some(id) => id,
+            None => {
+                return Err(
+                    "System resources active model doesn't exist, please fetch it or create it"
+                        .into(),
+                )
+            }
+        };
+
+        Ok(system_resources_id)
+	}
+
+	/// Update
+	///
 	/// TODO: This function is incomplete, update cores
 	pub async fn update(
 		&mut self,
@@ -162,13 +188,13 @@ impl SystemResourcesController {
 		db: &DatabaseConnection,
 	) -> Result<(), Box<dyn Error>> {
 		let resources = self.get_resources()?;
-		
+
 		// Create and insert resources
 		let system_resources_instance = SystemResourcesActiveModel {
 			eval_time: ActiveValue::Set(resources.eval_time.naive_utc()),
 			id: ActiveValue::Unchanged(system_resources_id),
 		};
-		
+
 		// Update system cores
 		let system_core_controller = CpuCoreController::new(
 			db.clone(),
@@ -176,27 +202,25 @@ impl SystemResourcesController {
 			Some(system_resources_instance.clone()),
 		);
 		// TODO: Update cores
-		
+
 		// System resources id
 		let system_resources_id = system_core_controller.id()?;
-		
+
 		// System memory instance
 		let system_memory_instance = resources
 			.memory
 			.try_into_active_model(system_resources_id)?;
 		system_memory_instance.save(db).await?;
-		
+
 		// Update storage
 		// We need to know how many storage devices do we have already
 		// We know storage devices name is unique
-		let system_resources_model = system_resources_instance
-			.clone()
-			.try_into_model()?;
+		let system_resources_model = system_resources_instance.clone().try_into_model()?;
 		let existing_storage_devices = system_resources_model
 			.find_related(StorageDeviceEntity)
 			.all(db)
 			.await?;
-		
+
 		// Compare with our storage devices and remove from the database those that aren't in this structure
 		let removed_devices: Vec<&entity::storage_device::Model> = existing_storage_devices
 			.iter()
@@ -210,11 +234,11 @@ impl SystemResourcesController {
 				if !is_there.is_empty() {
 					return true;
 				}
-				
+
 				false
 			})
 			.collect::<Vec<_>>();
-		
+
 		// Delete removed devices in parallel
 		let mut handles: Vec<tokio::task::JoinHandle<Result<(), anyhow::Error>>> = vec![];
 		for model in removed_devices {
@@ -226,26 +250,23 @@ impl SystemResourcesController {
 				Ok(())
 			}));
 		}
-		
+
 		// Wait for deletions to complete
 		for handle in handles {
 			handle.await??;
 		}
-		
+
 		// Insert storage data
 		for storage in &resources.storage {
 			let storage_instance = storage.try_into_active_model(system_resources_id)?;
 			storage_instance.save(db).await?;
 		}
-		
+
 		// It's a standard operation to save this at the end of everything else
 		// Save system resources evaluation time
-		system_resources_instance
-			.clone()
-			.save(db)
-			.await?;
+		system_resources_instance.clone().save(db).await?;
 		self.system_resources_active_model = Some(system_resources_instance);
-		
+
 		Ok(())
 	}
 
@@ -267,23 +288,22 @@ impl SystemResourcesController {
 			Some(model) => model,
 			None => return Err("Server location not found".into()),
 		};
-		
+
 		Ok(server_location)
 	}
-	
+
 	// /// Find server node related models
-	// /// 
-	// /// 
+	// ///
+	// ///
 	// pub fn find_server_node_related_models() -> Result<(Vec<SystemCoreActiveModel>, SystemMemoryActiveModel, Vec<StorageDevice>), Box<dyn Error>>{
 	// 	// TODO: Get system core related models
 	// 	let mut cores = Vec::new();
-		
-		
+
 	// 	// TODO: Get system memory related model
-		
+
 	// 	// TODO: Get storage related models
 	// 	let mut storage_devices = Vec::new();
-		
+
 	// }
 }
 
@@ -295,16 +315,16 @@ mod tests {
 		system_memory::Entity as SystemMemoryEntity, system_resources::Entity as SystemResources,
 	};
 	use sea_orm::{EntityTrait, ModelTrait};
-	
+
 	use super::*;
 	use crate::database::mysql_connection;
 	use crate::server_node::resources::{
+		storage::{DiskKind, Storage},
 		system_core::CpuCore,
 		system_memory::Memory,
-		storage::{DiskKind, Storage},
 		to_f32,
 	};
-	
+
 	#[test]
 	fn test_fetch_resources() {
 		let resources = Resources::fetch_resources().unwrap();
@@ -312,40 +332,40 @@ mod tests {
 		assert!(resources.memory.total > 0);
 		assert!(!resources.storage.is_empty()); // Check if storage vector is not empty
 	}
-	
+
 	#[test]
 	fn test_total_cores() {
 		let resources = Resources::fetch_resources().unwrap();
 		assert!(resources.total_cores() > 0);
 	}
-	
+
 	#[tokio::test]
 	async fn test_insert_data() {
 		// Set environment variables
 		dotenv::dotenv().ok();
-		
+
 		// Initialize database connection
 		let db = mysql_connection().await.unwrap();
-		
+
 		// Call the insert_data function
 		let mut system_resources_controller = SystemResourcesController::new(db.clone(), None);
-		system_resources_controller.insert_data().await.unwrap();
-		
+		system_resources_controller.insert().await.unwrap();
+
 		// Verify that data was inserted correctly
 		let system_resources = SystemResources::find().all(&db).await.unwrap();
-		
+
 		assert!(!system_resources.is_empty());
-		
+
 		let system_cores = SystemCore::find().all(&db).await.unwrap();
-		
+
 		assert!(!system_cores.is_empty());
-		
+
 		let system_memory = SystemMemoryEntity::find().all(&db).await.unwrap();
-		
+
 		assert!(!system_memory.is_empty());
-		
+
 		let storage_devices = StorageDevice::find().all(&db).await.unwrap();
-		
+
 		assert!(!storage_devices.is_empty());
 	}
 
@@ -359,7 +379,12 @@ mod tests {
 
 		// Insert initial data
 		let mut system_resources_controller = SystemResourcesController::new(db.clone(), None);
-		let resource_id = system_resources_controller.insert_data().await.unwrap();
+		let resource_id = system_resources_controller
+			.insert()
+			.await
+			.unwrap()
+			.id()
+			.unwrap();
 
 		// Update resources
 		let updated_resources = Resources {
@@ -434,7 +459,12 @@ mod tests {
 
 		// Insert initial data
 		let mut system_resources_controller = SystemResourcesController::new(db.clone(), None);
-		let resource_id = system_resources_controller.insert_data().await.unwrap();
+		let resource_id = system_resources_controller
+			.insert()
+			.await
+			.unwrap()
+			.id()
+			.unwrap();
 
 		// Get the ID of the inserted system resources
 		let res_model = SystemResources::find_by_id(resource_id)
@@ -463,7 +493,7 @@ mod tests {
 			}],
 			eval_time: Utc::now(),
 		};
-		
+
 		// Call the update function
 		let mut system_resources_controller =
 			SystemResourcesController::new(db.clone(), Some(updated_resources.clone()));
@@ -521,7 +551,12 @@ mod tests {
 
 		// Insert initial data
 		let mut system_resources_controller = SystemResourcesController::new(db.clone(), None);
-		let resource_id = system_resources_controller.insert_data().await.unwrap();
+		let resource_id = system_resources_controller
+			.insert()
+			.await
+			.unwrap()
+			.id()
+			.unwrap();
 
 		// Update resources
 		let updated_resources = Resources {

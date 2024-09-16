@@ -150,15 +150,15 @@ impl ServerNodeController {
 				let server_info_controller =
 					ServerInfoController::new(self.db.clone(), server_node.location.clone())
 						.await?;
-
+				
 				let model = server_info_controller
 					.insert()
 					.await?
 					.clone()
 					.into_active_model();
-
+				
 				self.server_location = Some(model.clone());
-
+				
 				model
 			}
 		};
@@ -177,23 +177,25 @@ impl ServerNodeController {
 			Err(_) => {
 				// Get server node
 				let server_node = self.get_server_node()?;
-
+				
 				// Create system resources controller
 				let mut system_resources_controller = SystemResourcesController::new(
 					self.db.clone(),
 					Some(server_node.resources.clone()),
 				);
-
-				system_resources_controller.insert_data().await?;
-
+				
+				system_resources_controller
+					.insert()
+					.await?;
+				
 				let model = system_resources_controller.get_resources_active_model()?;
-
+				
 				self.system_resources = Some(model.clone());
-
+				
 				model
 			}
 		};
-
+		
 		Ok(system_resources)
 	}
 
@@ -219,9 +221,9 @@ impl ServerNodeController {
 					.await?
 					.clone()
 					.into_active_model();
-
+				
 				self.system_info = Some(model.clone());
-
+				
 				model
 			}
 		};
