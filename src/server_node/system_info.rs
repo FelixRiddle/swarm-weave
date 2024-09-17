@@ -163,9 +163,9 @@ impl SystemInfoController {
 	/// 
 	pub async fn find_by_server_node_model(
 		db: DatabaseConnection,
-		server_node_active_model: ServerNodeModel
+		server_node_model: ServerNodeModel
 	) -> Result<SystemInfoModel, Box<dyn Error>> {
-		let system_info_id = match server_node_active_model.system_info_id {
+		let system_info_id = match server_node_model.system_info_id {
 			Some(id) => id,
 			None => return Err("Server location id not found".into()),
 		};

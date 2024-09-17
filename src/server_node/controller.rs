@@ -230,6 +230,65 @@ impl ServerNodeController {
 
 		Ok(system_info)
 	}
+	
+	/// Create new server node active model
+	/// 
+	/// 
+	pub async fn create_server_node_active_model(
+		&mut self
+	) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
+		// Get or create server location
+		let server_location_id = match self
+			.get_or_create_server_location()
+			.await?
+			.id
+			.clone()
+			.take()
+		{
+			Some(id) => id,
+			None => return Err("Server location id is not provided".into()),
+		};
+
+		// Get or create system resources
+		let system_resource_id = match self
+			.get_or_create_system_resources()
+			.await?
+			.id
+			.clone()
+			.take()
+		{
+			Some(id) => id,
+			None => return Err("System resource id is not provided".into()),
+		};
+
+		// Get or create system info
+		let system_info_id = match self.get_or_create_system_info().await?.id.clone().take()
+		{
+			Some(id) => id,
+			None => return Err("System info id is not provided".into()),
+		};
+		
+		// Convert to active model
+		let mut active_model = self.get_server_node()?.try_into_active_model(
+			server_location_id,
+			system_resource_id,
+			system_info_id,
+		)?;
+		
+		// Insert the model
+		let result = active_model
+			.clone()
+			.insert(&self.db)
+			.await?;
+		
+		// Update id
+		active_model.id = ActiveValue::Set(result.id);
+		
+		// Store on`` the controller
+		self.server_node_active_model = Some(active_model.clone());
+		
+		Ok(active_model)
+	}
 
 	/// Get or insert server node active model
 	///
@@ -241,62 +300,59 @@ impl ServerNodeController {
 	) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
 		let active_model = match self.get_server_node_active_model() {
 			Ok(active_model) => active_model.clone(),
-			Err(_) => {
-				// Get or create server location
-				let server_location_id = match self
-					.get_or_create_server_location()
-					.await?
-					.id
-					.clone()
-					.take()
-				{
-					Some(id) => id,
-					None => return Err("Server location id is not provided".into()),
-				};
-
-				// Get or create system resources
-				let system_resource_id = match self
-					.get_or_create_system_resources()
-					.await?
-					.id
-					.clone()
-					.take()
-				{
-					Some(id) => id,
-					None => return Err("System resource id is not provided".into()),
-				};
-
-				// Get or create system info
-				let system_info_id = match self.get_or_create_system_info().await?.id.clone().take()
-				{
-					Some(id) => id,
-					None => return Err("System info id is not provided".into()),
-				};
-				
-				// Convert to active model
-				let mut active_model = self.get_server_node()?.try_into_active_model(
-					server_location_id,
-					system_resource_id,
-					system_info_id,
-				)?;
-				
-				// Insert the model
-				let result = active_model
-					.clone()
-					.insert(&self.db)
-					.await?;
-				
-				// Update id
-				active_model.id = ActiveValue::Set(result.id);
-				
-				// Store on the controller
-				self.server_node_active_model = Some(active_model.clone());
-				
-				active_model
-			}
+			Err(_) => self.create_server_node_active_model().await?,
 		};
 		
 		Ok(active_model)
+	}
+	
+	/// Update server node models by server node id
+	/// 
+	/// Update models: System Information, System Resources and System Location by using
+	/// the server node id, to fetch related models on the database.
+	async fn update_server_node_models_by_id(
+        &mut self,
+		server_node_model: ServerNodeModel,
+    ) -> Result<&mut Self, Box<dyn Error>> {
+		// Find server location
+		let server_location_model = ServerInfoController::find_by_server_node_model(self.db.clone(), server_node_model.clone())
+			.await?;
+		self.server_location = Some(server_location_model.into());
+		
+		// Find system resources
+		let system_resources_model = SystemResourcesController::find_by_server_node_model(
+			self.db.clone(), server_node_model.clone()
+		)
+			.await?;
+		self.system_resources = Some(system_resources_model.into());
+		
+		// Find system info
+		let system_info_model = SystemInfoController::find_by_server_node_model(self.db.clone(), server_node_model).await?;
+		self.system_info = Some(system_info_model.into());
+		
+		Ok(self)
+	}
+	
+	/// Find server node by id
+	/// 
+	/// 
+	pub async fn find_by_id(
+		&mut self,
+		id: i64,
+	) -> Result<&mut Self, Box<dyn Error>> {
+		// Find server node id
+		let server_node_model = ServerNodeEntity::find_by_id(id)
+			.one(&self.db)
+			.await?;
+		match server_node_model {
+			Some(server_node_model) => {
+                self.update_server_node_models_by_id(server_node_model.clone()).await?;
+				self.server_node_active_model = Some(server_node_model.into());
+			}
+			None => return Err("Server node not found".into()),
+		};
+		
+		Ok(self)
 	}
 	
     /// Get server node id
@@ -407,7 +463,7 @@ impl ServerNodeController {
 			Some(server_node_model) => {
 				// Take status
 				let status = server_node_model.status.clone();
-
+				
 				// Find server location
 				let server_location_model = ServerInfoController::find_by_server_node_model(
 					db.clone(),
@@ -420,23 +476,23 @@ impl ServerNodeController {
 						return Err("Couldn't convert server location model to server info".into())
 					}
 				};
-
+				
 				// Find system resources
 				let system_resources_model = SystemResourcesController::find_by_server_node_model(
 					db.clone(),
 					server_node_model.clone(),
 				)
 				.await?;
-
+				
 				// Take id
 				let system_resources_id = system_resources_model.id.clone();
-
+				
 				// Create resources object from models
 				let system_resources_controller = SystemResourcesController::new(db.clone(), None);
 				let resources = system_resources_controller
 					.find_by_id_and_get_resources(system_resources_model, system_resources_id)
 					.await?;
-
+				
 				// Find system info
 				let system_info_model =
 					SystemInfoController::find_by_server_node_model(db.clone(), server_node_model)
@@ -445,13 +501,13 @@ impl ServerNodeController {
 					Some(system_info) => system_info,
 					None => return Err("Couldn't convert system info model to system info".into()),
 				};
-
+				
 				// Serve status
 				let status: ServerStatus = match status {
 					Some(status) => ServerStatus::from_status(status),
 					None => ServerStatus::Offline,
 				};
-
+				
 				// Create server node
 				let server_node = ServerNode {
 					location: server_location,
@@ -459,52 +515,27 @@ impl ServerNodeController {
 					resources,
 					system_info,
 				};
-
+				
 				server_node
 			}
 			None => return Err("Server node not found".into()),
 		};
-
+		
 		Ok(server_node)
 	}
 
 	/// Create new from server node id
 	///
-	/// FIXME: There are many redundant database roundtrips
+	/// 
 	pub async fn new_from_server_node_id(
 		db: DatabaseConnection,
 		id: u32,
 	) -> Result<Self, Box<dyn Error>> {
-		// FIXME: Server node side models are fetch first so there should be a way to pass them down to a new function as currently we are fetching the same data twice
-		// FIXME: Server node model is fetch twice too
-
-		// Find server node id
-		let server_node_model = ServerNodeEntity::find_by_id(id).one(&db).await?;
-		let server_node_model = match server_node_model {
-			Some(server_node_model) => server_node_model,
-			None => return Err("Server node not found".into()),
-		};
-
-		let (server_location_model, system_info_model, system_resources_model) =
-			Self::server_node_side_models(&db, server_node_model).await?;
-		let server_node = ServerNodeController::server_node_from_id(db.clone(), id).await?;
-
-		let server_location_id = server_location_model.id.clone();
-		let system_resources_id = system_resources_model.id.clone();
-		let system_info_id = system_info_model.id.clone();
-
-		Ok(Self {
-			db,
-			server_node: Some(server_node.clone()),
-			server_node_active_model: Some(server_node.try_into_active_model(
-				server_location_id,
-				system_resources_id,
-				system_info_id,
-			)?),
-			server_location: Some(server_location_model.into_active_model()),
-			system_resources: Some(system_resources_model.into_active_model()),
-			system_info: Some(system_info_model.into_active_model()),
-		})
+		let mut server_node_controller = ServerNodeController::new_bare(db.clone())?;
+		
+		server_node_controller.find_by_id(id.into()).await?;
+		
+		Ok(server_node_controller)
 	}
 }
 
@@ -526,6 +557,7 @@ mod tests {
 		controller.insert().await.unwrap();
 		
 		let id = controller.id().await.unwrap();
+		println!("Id: {}", id);
 		
 		// Find model
 		let mut server_node_controller = ServerNodeController::new_from_server_node_id(

@@ -289,9 +289,9 @@ impl SystemResourcesController {
 	///
 	pub async fn find_by_server_node_model(
 		db: DatabaseConnection,
-		server_node_active_model: ServerNodeModel,
+		server_node_model: ServerNodeModel,
 	) -> Result<SystemResourcesModel, Box<dyn Error>> {
-		let system_resource_id = match server_node_active_model.system_resource_id {
+		let system_resource_id = match server_node_model.system_resource_id {
 			Some(id) => id,
 			None => return Err("Server location id not found".into()),
 		};
