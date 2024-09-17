@@ -4,7 +4,8 @@ use std::error::Error;
 use reqwest::Client;
 
 use crate::server_node::ServerNode;
-// use crate::server_node::controller::ServerNodeController;
+use crate::server_node::controller::ServerNodeController;
+use crate::server::api::AppState;
 
 /// Server node
 ///
@@ -28,9 +29,11 @@ pub struct LocationRequest {
 /// Get server node information
 /// 
 /// When a server node location is given, this function can be used to retrieve node information and insert it on our database.
-/// 
-/// TODO: Finish this function
-pub async fn get_server_node_information(_req: HttpRequest, body: web::Json<LocationRequest>) -> Result<(), Box<dyn Error>> {
+pub async fn get_server_node_information(
+	_req: HttpRequest,
+	body: web::Json<LocationRequest>,
+	data: web::Data<AppState>
+) -> Result<(), Box<dyn Error>> {
 	let location = body.location.clone();
 
 	// Process the location here
@@ -45,19 +48,30 @@ pub async fn get_server_node_information(_req: HttpRequest, body: web::Json<Loca
 		.text()
 		.await?;
 	
-	let _server_node: ServerNode = serde_json::from_str(&server_info)?;
+	let server_node: ServerNode = serde_json::from_str(&server_info)?;
 	
-	// // Create server node
-	// let server_node_controller = ServerNodeController::new_bare()?;
+	// Get the database connection
+	let db_conn = data.db.clone();
+	
+	// Create server node
+	let mut server_node_controller = ServerNodeController::new_bare(
+		db_conn,
+	)?;
+	
+	server_node_controller.insert_server_node(server_node).await?;
 	
 	Ok(())
 }
 
 /// Create server node
 ///
-/// TODO: Get location information and store on the database
-async fn post_location(_req: HttpRequest, body: web::Json<LocationRequest>) -> impl Responder {
-	match get_server_node_information(_req, body).await {
+/// Get location information and store on the database
+async fn post_location(
+	_req: HttpRequest,
+	body: web::Json<LocationRequest>,
+	data: web::Data<AppState>
+) -> impl Responder {
+	match get_server_node_information(_req, body, data).await {
 		Ok(()) => {
 			HttpResponse::Ok().body("Location processed successfully")
 		}
