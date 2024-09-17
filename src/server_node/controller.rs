@@ -557,7 +557,6 @@ mod tests {
 		controller.insert().await.unwrap();
 		
 		let id = controller.id().await.unwrap();
-		println!("Id: {}", id);
 		
 		// Find model
 		let mut server_node_controller = ServerNodeController::new_from_server_node_id(
@@ -568,7 +567,10 @@ mod tests {
 			.unwrap();
 		let found_server_node_id = server_node_controller.id().await.unwrap();
 		
-		assert!(server_node_controller.server_node.is_some());
+		assert!(server_node_controller.server_node_active_model.is_some());
+		assert!(server_node_controller.system_info.is_some());
+		assert!(server_node_controller.system_resources.is_some());
+		assert!(server_node_controller.server_location.is_some());
 		assert_eq!(id, found_server_node_id);
 	}
 	
