@@ -62,8 +62,6 @@ impl From<ServerStatus> for Status {
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ServerNode {
-	// WARNING: This field is not used
-	pub id: u32,
 	pub location: ServerInfo,
 	pub status: ServerStatus,
 	pub resources: Resources,
@@ -71,9 +69,8 @@ pub struct ServerNode {
 }
 
 impl ServerNode {
-	pub fn new(id: u32) -> Result<Self, Box<dyn Error>> {
+	pub fn new() -> Result<Self, Box<dyn Error>> {
 		Ok(Self {
-			id,
 			location: ServerInfo::new()?,
 			status: ServerStatus::Online,
 			resources: Resources::fetch_resources()?,
@@ -91,7 +88,6 @@ impl ServerNode {
 		system_info_id: i64,
 	) -> Result<ServerNodeActiveModel, Box<dyn Error>> {
 		Ok(ServerNodeActiveModel {
-			id: ActiveValue::Set(i64::try_from(self.id)?),
 			status: ActiveValue::Set(Some(self.status.into())),
 			server_location_id: ActiveValue::Set(Some(server_location_id)),
 			system_resource_id: ActiveValue::Set(Some(resource_id)),
@@ -107,8 +103,7 @@ mod tests {
 
 	#[test]
 	fn test_server_node_new() {
-		let server_node = ServerNode::new(1).unwrap();
-		assert!(server_node.id > 0);
+		let server_node = ServerNode::new().unwrap();
 		assert!(server_node.location.name.len() > 0);
 		assert_eq!(server_node.status, ServerStatus::Online);
 		assert!(server_node.system_info.name.len() > 0);

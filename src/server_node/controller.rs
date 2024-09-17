@@ -78,7 +78,7 @@ impl ServerNodeController {
 		let server_node = match self.server_node.clone() {
 			Some(server_node) => server_node,
 			None => {
-				let server_node = ServerNode::new(1)?;
+				let server_node = ServerNode::new()?;
 
 				self.server_node = Some(server_node.clone());
 
@@ -404,7 +404,6 @@ impl ServerNodeController {
 			Some(server_node_model) => {
 				// Take status
 				let status = server_node_model.status.clone();
-				let server_node_id = server_node_model.id.clone();
 
 				// Find server location
 				let server_location_model = ServerInfoController::find_by_server_node_model(
@@ -452,7 +451,6 @@ impl ServerNodeController {
 
 				// Create server node
 				let server_node = ServerNode {
-					id: server_node_id.try_into()?,
 					location: server_location,
 					status,
 					resources,
@@ -509,8 +507,7 @@ impl ServerNodeController {
 
 #[cfg(test)]
 mod tests {
-	use entity::server_node::Entity as ServerNodeEntity;
-	use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait};
+	use sea_orm::ActiveValue;
 
 	use super::*;
 	use crate::database::mysql_connection;
@@ -520,13 +517,24 @@ mod tests {
 	#[tokio::test]
 	async fn test_insert() {
 		let db = mysql_connection().await.unwrap();
-		let mut controller = ServerNodeController::new_bare(db.clone()).unwrap();
 		
+		// Server node controller
+		let mut controller = ServerNodeController::new_bare(db.clone()).unwrap();
 		controller.insert().await.unwrap();
+		
 		let id = controller.id().await.unwrap();
 		
-		let server_node_controller = ServerNodeController::new_from_server_node_id(db.clone(), id as u32).await.unwrap();
+		// Find model
+		let mut server_node_controller = ServerNodeController::new_from_server_node_id(
+			db.clone(),
+			id as u32
+		)
+			.await
+			.unwrap();
+		let found_server_node_id = server_node_controller.id().await.unwrap();
+		
 		assert!(server_node_controller.server_node.is_some());
+		assert_eq!(id, found_server_node_id);
 	}
 	
 	// Shallow tests
@@ -535,7 +543,7 @@ mod tests {
 	#[tokio::test]
 	async fn test_new() {
 		let db = mysql_connection().await.unwrap();
-		let server_node = ServerNode::new(1).unwrap();
+		let server_node = ServerNode::new().unwrap();
 		let server_node_active_model = server_node.clone().try_into_active_model(1, 1, 1).unwrap();
 		let server_location = ServerLocationActiveModel {
 			id: ActiveValue::Set(1),
@@ -560,26 +568,31 @@ mod tests {
 		)
 		.unwrap();
 		
-		assert_eq!(controller.server_node.unwrap().id, 1);
-		assert_eq!(controller.server_node_active_model.unwrap().id, ActiveValue::Set(1));
 		assert_eq!(controller.server_location.unwrap().id, ActiveValue::Set(1));
 		assert_eq!(controller.system_resources.unwrap().id, ActiveValue::Set(1));
 		assert_eq!(controller.system_info.unwrap().id, ActiveValue::Set(1));
 	}
-
+	
 	#[tokio::test]
 	async fn test_get_server_node() {
 		let db = mysql_connection().await.unwrap();
-		let mut controller = ServerNodeController::new_bare(db).unwrap();
-
-		let server_node = controller.get_server_node().unwrap();
-		assert_eq!(server_node.id, 1);
+		let mut controller = ServerNodeController::new_bare(db.clone()).unwrap();
+		controller.insert().await.unwrap();
+		
+		let id = controller.id().await.unwrap();
+		let mut server_node = ServerNodeController::new_from_server_node_id(
+				db.clone(),
+				id as u32
+			)
+			.await
+			.unwrap();
+		assert_eq!(server_node.id().await.unwrap(), id);
 	}
-
+	
 	#[tokio::test]
 	async fn test_get_server_location() {
 		let db = mysql_connection().await.unwrap();
-		let server_node = ServerNode::new(1).unwrap();
+		let server_node = ServerNode::new().unwrap();
 		let server_location = ServerLocationActiveModel {
 			id: ActiveValue::Set(1),
 			..Default::default()

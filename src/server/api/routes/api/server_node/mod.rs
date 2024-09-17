@@ -4,13 +4,13 @@ use std::error::Error;
 use reqwest::Client;
 
 use crate::server_node::ServerNode;
-use crate::server_node::controller::ServerNodeController;
+// use crate::server_node::controller::ServerNodeController;
 
 /// Server node
 ///
 ///
 async fn get_server_node() -> impl Responder {
-	match ServerNode::new(1) {
+	match ServerNode::new() {
 		Ok(server_node) => HttpResponse::Ok().json(server_node),
 		Err(err) => {
 			HttpResponse::InternalServerError().body(format!("Error creating ServerNode: {}", err))
@@ -45,7 +45,7 @@ pub async fn get_server_node_information(_req: HttpRequest, body: web::Json<Loca
 		.text()
 		.await?;
 	
-	let server_node: ServerNode = serde_json::from_str(&server_info)?;
+	let _server_node: ServerNode = serde_json::from_str(&server_info)?;
 	
 	// // Create server node
 	// let server_node_controller = ServerNodeController::new_bare()?;
