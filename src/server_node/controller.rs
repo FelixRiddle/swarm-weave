@@ -5,7 +5,7 @@ use entity::{
 	system_info::{ActiveModel as SystemInfoActiveModel, Model as SystemInfoModel},
 	system_resources::{ActiveModel as SystemResourcesActiveModel, Model as SystemResourcesModel},
 };
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, IntoActiveModel};
+use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, IntoActiveModel};
 use std::error::Error;
 
 use super::resources::controller::SystemResourcesController;
@@ -274,25 +274,28 @@ impl ServerNodeController {
 				};
 				
 				// Convert to active model
-				let active_model = self.get_server_node()?.try_into_active_model(
+				let mut active_model = self.get_server_node()?.try_into_active_model(
 					server_location_id,
 					system_resource_id,
 					system_info_id,
 				)?;
 				
 				// Insert the model
-				active_model
+				let result = active_model
 					.clone()
 					.insert(&self.db)
 					.await?;
 				
+				// Update id
+				active_model.id = ActiveValue::Set(result.id);
+				
 				// Store on the controller
 				self.server_node_active_model = Some(active_model.clone());
-
+				
 				active_model
 			}
 		};
-
+		
 		Ok(active_model)
 	}
 	
@@ -576,17 +579,23 @@ mod tests {
 	#[tokio::test]
 	async fn test_get_server_node() {
 		let db = mysql_connection().await.unwrap();
+		
+		// Create and insert server node
 		let mut controller = ServerNodeController::new_bare(db.clone()).unwrap();
 		controller.insert().await.unwrap();
-		
 		let id = controller.id().await.unwrap();
+		
+		// Find and verify server node
 		let mut server_node = ServerNodeController::new_from_server_node_id(
 				db.clone(),
 				id as u32
 			)
 			.await
 			.unwrap();
-		assert_eq!(server_node.id().await.unwrap(), id);
+		let server_node_id = server_node.id().await.unwrap();
+		
+		println!("Inserted server node id: {}", id);
+		assert_eq!(server_node_id, id);
 	}
 	
 	#[tokio::test]
