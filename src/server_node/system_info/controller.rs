@@ -98,7 +98,6 @@ impl SystemInfoController {
 				
 				// Update id
 				active_model.id = ActiveValue::Unchanged(new_model.id.clone());
-				println!("Set active model id to: {}", new_model.id);
 				
 				// Update active model
 				self.system_info_active_model = Some(active_model.clone());
@@ -236,21 +235,16 @@ mod tests {
 		controller.system_info.name = name_1.clone();
 		controller.insert().await.unwrap();
 		assert_eq!(controller.system_info.name, name_1.as_str());
-		println!("Inserted");
 		
 		// Clone before updating
 		let mut new_controller = controller.clone();
 		
 		// Update name
 		controller.system_info.name = name_2.clone();
-		println!("Updating");
-		println!("New name: {}", controller.system_info.name);
 		controller.update().await.unwrap();
-		println!("Updated");
 		
 		// Get and validate system info
 		let id = controller.id().await.unwrap();
-		println!("Id: {}", id);
 		let found_controller = new_controller.find(id).await.unwrap();
 		
 		assert_eq!(found_controller.system_info.name, name_2);
