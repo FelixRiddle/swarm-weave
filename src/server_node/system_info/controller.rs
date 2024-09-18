@@ -48,7 +48,24 @@ impl SystemInfoController {
 	}
 }
 
+/// Get
+/// 
+/// 
 impl SystemInfoController {
+	/// Id
+	/// 
+	/// 
+	pub async fn id(&mut self) -> Result<i64, Box<dyn Error>> {
+        let active_model = self.get_or_create_system_info().await?;
+		
+		let id = match active_model.id.clone().take() {
+            Some(id) => id,
+            None => return Err("System info id doesn't exists".into()),
+        };
+		
+		Ok(id)
+    }
+	
 	/// Get or create system info
 	/// 
 	/// 
@@ -77,6 +94,51 @@ impl SystemInfoController {
 		
 		Ok(active_model)
 	}
+
+	/// Find
+	/// 
+	/// 
+	pub async fn find(&mut self, id: i64) -> Result<&mut Self, Box<dyn Error>> {
+		let found_system_info: Option<SystemInfoModel> =
+			SystemInfoEntity::find_by_id(id).one(&self.db).await?;
+		
+		// Convert to normal model
+		let system_info: SystemInfo = match found_system_info {
+			Some(model) => {
+				// Update active model
+				self.system_info_active_model = Some(model.clone().into());
+				
+				model.into()
+			},
+			None => return Err("System info not found".into()),
+		};
+		
+		self.system_info = system_info;
+		
+		Ok(self)
+	}
+	
+	/// Find by server node model
+	///
+	///
+	pub async fn find_by_server_node_model(
+		db: DatabaseConnection,
+		server_node_model: ServerNodeModel,
+	) -> Result<SystemInfoModel, Box<dyn Error>> {
+		let system_info_id = match server_node_model.system_info_id {
+			Some(id) => id,
+			None => return Err("Server location id not found".into()),
+		};
+		let server_location = match SystemInfoEntity::find_by_id(system_info_id)
+			.one(&db)
+			.await?
+		{
+			Some(model) => model,
+			None => return Err("Server location not found".into()),
+		};
+
+		Ok(server_location)
+	}
 }
 
 impl SystemInfoController {
@@ -99,44 +161,10 @@ impl SystemInfoController {
 		Ok(self)
 	}
 
-	pub async fn find(&mut self, id: i64) -> Result<&mut Self, Box<dyn Error>> {
-		let found_system_info: Option<SystemInfoModel> =
-			SystemInfoEntity::find_by_id(id).one(&self.db).await?;
-		let system_info: SystemInfo = match found_system_info {
-			Some(model) => model.into(),
-			None => return Err("System info not found".into()),
-		};
-
-		self.system_info = system_info;
-		Ok(self)
-	}
-
 	pub async fn delete(self, id: i64) -> Result<Self, Box<dyn Error>> {
 		SystemInfoEntity::delete_by_id(id).exec(&self.db).await?;
 
 		Ok(self)
-	}
-
-	/// Find by server node model
-	///
-	///
-	pub async fn find_by_server_node_model(
-		db: DatabaseConnection,
-		server_node_model: ServerNodeModel,
-	) -> Result<SystemInfoModel, Box<dyn Error>> {
-		let system_info_id = match server_node_model.system_info_id {
-			Some(id) => id,
-			None => return Err("Server location id not found".into()),
-		};
-		let server_location = match SystemInfoEntity::find_by_id(system_info_id)
-			.one(&db)
-			.await?
-		{
-			Some(model) => model,
-			None => return Err("Server location not found".into()),
-		};
-
-		Ok(server_location)
 	}
 }
 
@@ -166,12 +194,17 @@ mod tests {
 		let connection = mysql_connection().await.unwrap();
 		
 		// Create system info
-		let controller = SystemInfoController::new_bare(&connection).await.unwrap();
-		let model = controller.clone().insert().await.unwrap();
+		let mut controller = SystemInfoController::new_bare(&connection).await.unwrap();
+		controller.insert().await.unwrap();
 		
-		// TODO: Get and validate system info
-		// assert!(model.name.len() > 0);
-		// assert!(model.id > 0);
+		// Get and validate system info
+		let id = controller.id().await.unwrap();
+		let mut new_controller = controller.clone();
+		let found_controller = new_controller.find(id).await.unwrap();
+		let id = found_controller.id().await.unwrap();
+		
+		assert!(found_controller.system_info.name.len() > 0);
+		assert!(id > 0);
 	}
 
 	#[tokio::test]
@@ -187,31 +220,34 @@ mod tests {
 	#[tokio::test]
 	async fn test_system_info_controller_find() {
 		let connection = mysql_connection().await.unwrap();
-		let controller = SystemInfoController::new_bare(&connection).await.unwrap();
+		let mut controller = SystemInfoController::new_bare(&connection).await.unwrap();
 
 		// Insert model
-		let model = controller.clone().insert().await.unwrap();
-
+		controller.insert().await.unwrap();
+		
 		// Find model
+		let id = controller.id().await.unwrap();
 		let mut new_controller = controller.clone();
-		// FIXME: This
-		// let found_controller = new_controller.find(model.id).await.unwrap();
+		let found_controller = new_controller.find(id).await.unwrap();
 
-		// assert_eq!(
-		// 	found_controller.system_info.name,
-		// 	controller.system_info.name
-		// );
+		assert_eq!(
+			found_controller.system_info.name,
+			controller.system_info.name
+		);
 	}
 
 	#[tokio::test]
 	async fn test_system_info_controller_delete() {
 		let connection = mysql_connection().await.unwrap();
-		let controller = SystemInfoController::new_bare(&connection).await.unwrap();
+		let mut controller = SystemInfoController::new_bare(&connection).await.unwrap();
 
-		let model = controller.clone().insert().await.unwrap();
+		// Insert model
+		controller.insert().await.unwrap();
+		let id = controller.id().await.unwrap();
 		
-		// FIXME: This
-		// let mut controller = controller.delete(model.id).await.unwrap();
-		// assert!(controller.find(model.id).await.is_err());
+		// Delete data
+		let mut controller = controller.delete(id).await.unwrap();
+		
+		assert!(controller.find(id).await.is_err());
 	}
 }
