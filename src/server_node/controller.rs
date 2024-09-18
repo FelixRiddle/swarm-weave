@@ -212,15 +212,13 @@ impl ServerNodeController {
 				let server_node = self.get_server_node()?;
 
 				// Create system info controller
-				let system_info_controller =
+				let mut system_info_controller =
 					SystemInfoController::new(self.db.clone(), server_node.system_info.clone())
 						.await?;
 
 				let model = system_info_controller
-					.insert()
-					.await?
-					.clone()
-					.into_active_model();
+					.get_or_create_system_info()
+					.await?;
 				
 				self.system_info = Some(model.clone());
 				
