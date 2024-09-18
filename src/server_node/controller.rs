@@ -10,7 +10,7 @@ use std::error::Error;
 
 use super::resources::controller::SystemResourcesController;
 use super::server_info::{controller::ServerInfoController, ServerInfo};
-use super::system_info::{SystemInfo, SystemInfoController};
+use super::system_info::{SystemInfo, controller::SystemInfoController};
 use super::{ServerNode, ServerStatus};
 
 /// Server node controller

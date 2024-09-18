@@ -13,18 +13,9 @@ pub mod resources;
 pub mod server_info;
 pub mod system_info;
 
-pub use resources::{
-	Resources,
-	controller::SystemResourcesController,
-	system_core::controller::CpuCoreController,
-	system_memory::controller::MemoryController,
-	storage::controller::StorageController,
-};
-pub use server_info::ServerInfo;
-pub use system_info::{
-	SystemInfo,
-	SystemInfoController,
-};
+use resources::Resources;
+use server_info::ServerInfo;
+use system_info::SystemInfo;
 
 #[derive(Clone, Debug, Display, PartialEq, Deserialize, Serialize)]
 pub enum ServerStatus {

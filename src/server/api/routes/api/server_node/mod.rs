@@ -87,7 +87,7 @@ pub fn main() -> Scope {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::{server::api::CreateAppState, server_node::ServerStatus};
+	use crate::server_node::ServerStatus;
 	use actix_web::{http::StatusCode, test, App};
 
 	#[actix_web::test]
