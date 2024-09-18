@@ -71,7 +71,21 @@ impl SystemInfoController {
 	/// 
 	pub async fn get_or_create_system_info(&mut self) -> Result<SystemInfoActiveModel, Box<dyn Error>> {
 		let active_model = match self.system_info_active_model.clone() {
-			Some(system_info_active_model) => system_info_active_model,
+			Some(system_info_active_model) => {
+				// Get system info id
+				let id = match system_info_active_model.id.clone().take() {
+					Some(id) => id,
+					None => return Err("System info id doesn't exists".into()),
+				};
+				
+				// Convert into active model
+				let mut model = self.system_info.clone().into_active_model();
+				
+				// Set id
+				model.id = ActiveValue::Unchanged(id);
+				
+				model
+			},
 			None => {
 				// Create active model
 				let mut active_model = self.system_info.clone().into_active_model();
@@ -84,6 +98,7 @@ impl SystemInfoController {
 				
 				// Update id
 				active_model.id = ActiveValue::Unchanged(new_model.id.clone());
+				println!("Set active model id to: {}", new_model.id);
 				
 				// Update active model
 				self.system_info_active_model = Some(active_model.clone());
@@ -151,13 +166,15 @@ impl SystemInfoController {
 		Ok(self)
 	}
 
-	pub async fn update(self) -> Result<Self, Box<dyn Error>> {
-		self.system_info
-			.clone()
-			.into_active_model()
+	/// Update model
+	/// 
+	/// Convert system info into active model and update
+	pub async fn update(&mut self) -> Result<&Self, Box<dyn Error>> {
+		self.get_or_create_system_info()
+			.await?
 			.update(&self.db)
 			.await?;
-
+		
 		Ok(self)
 	}
 
@@ -211,10 +228,32 @@ mod tests {
 	async fn test_system_info_controller_update() {
 		let connection = mysql_connection().await.unwrap();
 		let mut controller = SystemInfoController::new_bare(&connection).await.unwrap();
-
-		controller.system_info.name = "New name".to_string();
-		controller = controller.update().await.unwrap();
-		assert_eq!(controller.system_info.name, "New name");
+		
+		let name_1 = "Name 1".to_string();
+		let name_2 = "Name 2".to_string();
+		
+		// Set name
+		controller.system_info.name = name_1.clone();
+		controller.insert().await.unwrap();
+		assert_eq!(controller.system_info.name, name_1.as_str());
+		println!("Inserted");
+		
+		// Clone before updating
+		let mut new_controller = controller.clone();
+		
+		// Update name
+		controller.system_info.name = name_2.clone();
+		println!("Updating");
+		println!("New name: {}", controller.system_info.name);
+		controller.update().await.unwrap();
+		println!("Updated");
+		
+		// Get and validate system info
+		let id = controller.id().await.unwrap();
+		println!("Id: {}", id);
+		let found_controller = new_controller.find(id).await.unwrap();
+		
+		assert_eq!(found_controller.system_info.name, name_2);
 	}
 
 	#[tokio::test]
