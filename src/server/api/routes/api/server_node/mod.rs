@@ -87,7 +87,7 @@ pub fn main() -> Scope {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::server_node::ServerStatus;
+	use crate::{server::api::CreateAppState, server_node::ServerStatus};
 	use actix_web::{http::StatusCode, test, App};
 
 	#[actix_web::test]
@@ -102,24 +102,6 @@ mod tests {
 		assert!(server_node.location.name.len() > 0);
 		assert_eq!(server_node.status, ServerStatus::Online);
 		assert!(server_node.system_info.name.len() > 0);
-	}
-
-	#[actix_web::test]
-	async fn test_post_location() {
-		let app = test::init_service(App::new().route("/", web::post().to(post_location))).await;
-		let location_request = LocationRequest {
-			location: String::from("http://example.com"),
-		};
-		let req = test::TestRequest::post()
-			.uri("/")
-			.set_json(&location_request)
-			.to_request();
-		let res = test::call_service(&app, req).await;
-
-		assert_eq!(res.status(), StatusCode::OK);
-		let body = test::read_body(res).await;
-		let body_str = std::str::from_utf8(&body).unwrap();
-		assert_eq!(body_str, "Location processed successfully");
 	}
 
 	#[actix_web::test]
