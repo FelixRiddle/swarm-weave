@@ -334,7 +334,6 @@ mod tests {
 	use crate::database::mysql_connection;
 	use crate::server_node::resources::{
 		storage::{DiskKind, Storage},
-		system_core::CpuCore,
 		system_memory::Memory,
 		to_f32,
 	};
@@ -402,10 +401,8 @@ mod tests {
 
 		// Update resources
 		let updated_resources = Resources {
-			cpus: vec![CpuCore {
-				usage_percentage: 50.0,
-				free_percentage: 50.0,
-			}],
+			// Non-variable cpus quantity
+			cpus: system_resources_controller.get_resources().unwrap().cpus,
 			memory: Memory {
 				total: 8_589_934_592,
 				used: 4_294_967_296,
@@ -490,10 +487,8 @@ mod tests {
 
 		// Update resources
 		let updated_resources = Resources {
-			cpus: vec![CpuCore {
-				usage_percentage: 50.0,
-				free_percentage: 50.0,
-			}],
+			// Non-variable cpus quantity
+			cpus: system_resources_controller.get_resources().unwrap().cpus,
 			memory: Memory {
 				total: 8_589_934_592,
 				used: 4_294_967_296,
@@ -571,13 +566,11 @@ mod tests {
 			.unwrap()
 			.id()
 			.unwrap();
-
+		
 		// Update resources
 		let updated_resources = Resources {
-			cpus: vec![CpuCore {
-				usage_percentage: 50.0,
-				free_percentage: 50.0,
-			}],
+			// Non-variable cpus quantity
+			cpus: system_resources_controller.get_resources().unwrap().cpus,
 			memory: Memory {
 				total: 8_589_934_592,
 				used: 4_294_967_296,

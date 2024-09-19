@@ -19,11 +19,14 @@ async fn get_server_node() -> impl Responder {
 	}
 }
 
+/// Location request
+/// 
+/// The body of 'post_location'
 #[derive(Deserialize, Serialize)]
 pub struct LocationRequest {
 	// Can be anything an ip, a domain, a url, etc...
 	// The only conditions is that it's accessible
-	location: String,
+	pub location: String,
 }
 
 /// Get server node information
