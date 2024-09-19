@@ -78,6 +78,10 @@ features = [
 [dependencies.migration]
 path = "migration"
 
+[dependencies.openssl]
+features = ["vendored"]
+version = "0.10.66"
+
 [dependencies.sea-orm]
 version = "1.0.1"
 features = [
